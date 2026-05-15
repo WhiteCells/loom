@@ -1,0 +1,24 @@
+{
+    "data": [
+        {
+            "id": "gpt-5.5-high",
+            "object": "model",
+            "created": 1626777600,
+            "owned_by": "custom",
+            "supported_endpoint_types": [
+                "openai"
+            ]
+        },
+        {
+            "id": "gpt-5.5-xhigh",
+            "object": "model",
+            "created": 1626777600,
+            "owned_by": "custom",
+            "supported_endpoint_types": [
+                "openai"
+            ]
+        }
+    ],
+    "object": "list",
+    "success": true
+}

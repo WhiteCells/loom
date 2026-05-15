@@ -1,0 +1,10 @@
+{
+  "qt-qml.qmlls.enabled": true,
+  "qt-qml.qmlls.customExePath": "/usr/lib/qt6/bin/qmlls",
+  "qt-qml.qmlls.additionalImportPaths": [
+    "${workspaceFolder}/build",
+    "${workspaceFolder}/build/Loom",
+    "${workspaceFolder}/qml",
+    "/usr/lib/qt6/qml"
+  ]
+}
