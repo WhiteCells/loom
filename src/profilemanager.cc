@@ -481,7 +481,7 @@ void ProfileManager::applyConfiguration(Profile &profile,
     profile.requiresOpenAiAuth = requiresOpenAiAuth;
 
     const QString trimmedApiKey = apiKey.trimmed();
-    if (!trimmedApiKey.isEmpty() && trimmedApiKey != maskedApiKey(profile.apiKey)) {
+    if (trimmedApiKey != maskedApiKey(profile.apiKey)) {
         profile.apiKey = trimmedApiKey;
     }
 
@@ -808,6 +808,9 @@ bool ProfileManager::writeProfileToDisk(Profile *profile, const QString &previou
         return false;
     }
     QTextStream envStream(&envFile);
+    if (!profile->apiKey.isEmpty()) {
+        envStream << "OPENAI_API_KEY=" << envValue(profile->apiKey) << "\n";
+    }
     if (!profile->httpProxy.isEmpty()) {
         envStream << "HTTP_PROXY=" << envValue(profile->httpProxy) << "\n";
     }

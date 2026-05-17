@@ -220,8 +220,8 @@ Item {
         editorNameField.text = profile.name || ""
         editorProviderBox.currentIndex = page.indexFor(page.providers, profile.modelProvider || "OpenAI")
         editorBaseUrlField.text = profile.baseUrl || ""
-        editorApiKeyField.text = ""
-        editorApiKeyField.placeholderText = profile.maskedApiKey || "sk-..."
+        editorApiKeyField.text = profile.apiKey || ""
+        editorApiKeyField.placeholderText = "sk-..."
         editorHttpProxyField.text = profile.httpProxy || ""
         editorHttpsProxyField.text = profile.httpsProxy || ""
         editorStorageSwitch.checked = profile.disableResponseStorage !== false
