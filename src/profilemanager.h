@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QDir>
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
@@ -32,12 +33,24 @@ public:
     QString statusMessage() const;
     QVariantList tokenUsage() const;
 
-    Q_INVOKABLE void activateSelectedProfile();
+    Q_INVOKABLE bool activateSelectedProfile();
     Q_INVOKABLE void createProfile();
+    Q_INVOKABLE bool createProfileWithConfiguration(const QString &name,
+                                                    const QString &agentType,
+                                                    const QString &modelProvider,
+                                                    const QString &model,
+                                                    const QString &reasoningEffort,
+                                                    const QString &baseUrl,
+                                                    const QString &apiKey,
+                                                    const QString &httpProxy,
+                                                    const QString &httpsProxy,
+                                                    bool disableResponseStorage,
+                                                    const QString &wireApi,
+                                                    bool requiresOpenAiAuth);
     Q_INVOKABLE void deleteSelectedProfile();
     Q_INVOKABLE void editSelectedProfile();
     Q_INVOKABLE void runHealthCheck();
-    Q_INVOKABLE void saveConfiguration(const QString &name,
+    Q_INVOKABLE bool saveConfiguration(const QString &name,
                                        const QString &agentType,
                                        const QString &modelProvider,
                                        const QString &model,
@@ -45,8 +58,13 @@ public:
                                        const QString &baseUrl,
                                        const QString &apiKey,
                                        const QString &httpProxy,
-                                       const QString &httpsProxy);
+                                       const QString &httpsProxy,
+                                       bool disableResponseStorage,
+                                       const QString &wireApi,
+                                       bool requiresOpenAiAuth);
     Q_INVOKABLE void selectProfile(int index);
+    Q_INVOKABLE bool selectProfileByFolderName(const QString &folderName);
+    Q_INVOKABLE bool setActiveProfileByFolderName(const QString &folderName);
     Q_INVOKABLE void selectSection(const QString &section);
 
 signals:
@@ -72,9 +90,13 @@ private:
         QString apiKey;
         QString httpProxy;
         QString httpsProxy;
+        QString wireApi = QStringLiteral("responses");
+        QString folderName;
         int todayTokens = 0;
         int monthlyLimit = 500000;
         bool active = false;
+        bool disableResponseStorage = true;
+        bool requiresOpenAiAuth = true;
     };
 
     struct HealthCheck
@@ -87,12 +109,35 @@ private:
     };
 
     QVariantMap healthCheckToMap(const HealthCheck &check) const;
+    bool applySelectedProfileToCodex();
+    void applyConfiguration(Profile &profile,
+                            const QString &name,
+                            const QString &agentType,
+                            const QString &modelProvider,
+                            const QString &model,
+                            const QString &reasoningEffort,
+                            const QString &baseUrl,
+                            const QString &apiKey,
+                            const QString &httpProxy,
+                            const QString &httpsProxy,
+                            bool disableResponseStorage,
+                            const QString &wireApi,
+                            bool requiresOpenAiAuth);
+    bool copyFileReplacing(const QString &sourcePath, const QString &targetPath);
+    bool ensureProfileRoot();
+    QString fileError(const QString &action, const QString &path) const;
+    QString profileFolderName(const QString &profileName) const;
+    QDir profileRootDir() const;
+    bool isValidProfileName(const QString &name) const;
+    void loadProfilesFromDisk();
     QString maskedApiKey(const QString &apiKey) const;
     QVariantMap profileToMap(const Profile &profile, int index) const;
+    bool readProfileFromDirectory(const QString &folderName, Profile *profile) const;
     Profile *selectedProfile();
     const Profile *selectedProfile() const;
     void emitDataChanged();
     void setStatusMessage(const QString &message);
+    bool writeProfileToDisk(Profile *profile, const QString &previousFolderName = QString());
 
     QVector<Profile> m_profiles;
     QVector<HealthCheck> m_healthChecks;

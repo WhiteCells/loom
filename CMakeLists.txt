@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(QML_MODULE_URI Loom)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Svg)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Network Qml Quick QuickControls2 Svg Widgets)
 
 qt_standard_project_setup(REQUIRES 6.5)
 qt6_policy(SET QTP0004 NEW)
@@ -19,6 +19,8 @@ set_source_files_properties(qml/Theme.qml PROPERTIES
 )
 set_source_files_properties(qml/components/ActionButton.qml PROPERTIES QT_RESOURCE_ALIAS components/ActionButton.qml)
 set_source_files_properties(qml/components/CodeCard.qml PROPERTIES QT_RESOURCE_ALIAS components/CodeCard.qml)
+set_source_files_properties(qml/components/DetailTile.qml PROPERTIES QT_RESOURCE_ALIAS components/DetailTile.qml)
+set_source_files_properties(qml/components/DetailValueRow.qml PROPERTIES QT_RESOURCE_ALIAS components/DetailValueRow.qml)
 set_source_files_properties(qml/components/FormComboBox.qml PROPERTIES QT_RESOURCE_ALIAS components/FormComboBox.qml)
 set_source_files_properties(qml/components/FormTextField.qml PROPERTIES QT_RESOURCE_ALIAS components/FormTextField.qml)
 set_source_files_properties(qml/components/Icon.qml PROPERTIES QT_RESOURCE_ALIAS components/Icon.qml)
@@ -27,6 +29,8 @@ set_source_files_properties(qml/components/Pill.qml PROPERTIES QT_RESOURCE_ALIAS
 set_source_files_properties(qml/components/SettingsNavItem.qml PROPERTIES QT_RESOURCE_ALIAS components/SettingsNavItem.qml)
 set_source_files_properties(qml/components/SidebarItem.qml PROPERTIES QT_RESOURCE_ALIAS components/SidebarItem.qml)
 set_source_files_properties(qml/components/StatCard.qml PROPERTIES QT_RESOURCE_ALIAS components/StatCard.qml)
+set_source_files_properties(qml/components/StyledScrollBar.qml PROPERTIES QT_RESOURCE_ALIAS components/StyledScrollBar.qml)
+set_source_files_properties(qml/components/ToggleSwitch.qml PROPERTIES QT_RESOURCE_ALIAS components/ToggleSwitch.qml)
 set_source_files_properties(qml/pages/DashboardPage.qml PROPERTIES QT_RESOURCE_ALIAS pages/DashboardPage.qml)
 set_source_files_properties(qml/pages/HealthChecksPage.qml PROPERTIES QT_RESOURCE_ALIAS pages/HealthChecksPage.qml)
 set_source_files_properties(qml/pages/ProfilesPage.qml PROPERTIES QT_RESOURCE_ALIAS pages/ProfilesPage.qml)
@@ -37,6 +41,8 @@ qt_add_executable(${PROJECT_NAME}
     src/main.cc
     src/profilemanager.cc
     src/profilemanager.h
+    src/settingsmanager.cc
+    src/settingsmanager.h
 )
 
 qt_add_qml_module(${PROJECT_NAME}
@@ -47,6 +53,8 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/Theme.qml
         qml/components/ActionButton.qml
         qml/components/CodeCard.qml
+        qml/components/DetailTile.qml
+        qml/components/DetailValueRow.qml
         qml/components/FormComboBox.qml
         qml/components/FormTextField.qml
         qml/components/Icon.qml
@@ -55,6 +63,8 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/components/SettingsNavItem.qml
         qml/components/SidebarItem.qml
         qml/components/StatCard.qml
+        qml/components/StyledScrollBar.qml
+        qml/components/ToggleSwitch.qml
         qml/pages/DashboardPage.qml
         qml/pages/HealthChecksPage.qml
         qml/pages/ProfilesPage.qml
@@ -78,10 +88,12 @@ target_link_libraries(${PROJECT_NAME}
     PRIVATE
         Qt6::Core
         Qt6::Gui
+        Qt6::Network
         Qt6::Qml
         Qt6::Quick
         Qt6::QuickControls2
         Qt6::Svg
+        Qt6::Widgets
 )
 
 target_compile_definitions(${PROJECT_NAME}

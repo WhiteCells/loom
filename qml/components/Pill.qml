@@ -14,18 +14,19 @@ Rectangle {
     implicitHeight: 22
     radius: height / 2
     color: fill
+    clip: true
 
     Row {
         id: pillContent
         anchors.centerIn: parent
         spacing: pill.iconName.length > 0 ? 5 : 0
-        height: Math.max(iconSlot.implicitHeight, pillText.implicitHeight)
+        height: 14
 
         Item {
             id: iconSlot
             visible: pill.iconName.length > 0
-            implicitWidth: 12
-            implicitHeight: 12
+            width: visible ? 12 : 0
+            height: 12
             anchors.verticalCenter: parent.verticalCenter
 
             Icon {
@@ -39,9 +40,11 @@ Rectangle {
         Text {
             id: pillText
             text: pill.text
+            height: parent.height
             color: pill.foreground
             font.pixelSize: 12
             font.weight: Font.DemiBold
+            verticalAlignment: Text.AlignVCenter
             anchors.verticalCenter: parent.verticalCenter
         }
     }

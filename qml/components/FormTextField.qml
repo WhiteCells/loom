@@ -6,21 +6,54 @@ TextField {
     id: control
 
     property bool secret: false
+    property bool secretVisible: false
 
-    implicitHeight: 34
-    leftPadding: 12
-    rightPadding: 12
+    implicitHeight: 40
+    leftPadding: 14
+    rightPadding: secret ? 44 : 14
     color: Theme.text
     placeholderTextColor: Theme.dim
-    selectedTextColor: "white"
+    selectedTextColor: Theme.accentText
     selectionColor: Theme.accent
-    echoMode: secret ? TextInput.Password : TextInput.Normal
+    echoMode: secret && !secretVisible ? TextInput.Password : TextInput.Normal
     font.pixelSize: 13
+    verticalAlignment: TextInput.AlignVCenter
+    selectByMouse: true
 
     background: Rectangle {
-        radius: 6
-        color: Theme.panel
+        radius: 8
+        color: !control.enabled ? Theme.controlDisabled : (control.activeFocus ? Theme.controlHover : Theme.control)
         border.width: 1
-        border.color: control.activeFocus ? Theme.accent : (control.hovered ? Theme.borderStrong : Theme.border)
+        border.color: !control.enabled ? Theme.border : (control.activeFocus ? Theme.accent : (control.hovered ? Theme.controlBorderStrong : Theme.controlBorder))
+
+        Behavior on color {
+            ColorAnimation {
+                duration: 120
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        Behavior on border.color {
+            ColorAnimation {
+                duration: 120
+                easing.type: Easing.OutCubic
+            }
+        }
+    }
+
+    ActionButton {
+        visible: control.secret
+        text: ""
+        iconName: control.secretVisible ? "eye-off" : "eye"
+        tooltip: control.secretVisible ? "Hide" : "Show"
+        implicitWidth: 28
+        implicitHeight: 28
+        anchors.right: parent.right
+        anchors.rightMargin: 6
+        anchors.verticalCenter: parent.verticalCenter
+        onClicked: {
+            control.secretVisible = !control.secretVisible
+            control.forceActiveFocus()
+        }
     }
 }

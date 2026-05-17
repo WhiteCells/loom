@@ -6,7 +6,7 @@ Item {
     id: root
 
     property string name: ""
-    property color color: Theme.text
+    property color color: Theme.icon
     property int size: 16
 
     implicitWidth: size

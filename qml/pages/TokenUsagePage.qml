@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import Loom
 
@@ -27,6 +28,8 @@ Item {
                 font.pixelSize: 26
                 font.weight: Font.Bold
                 Layout.fillWidth: true
+                Layout.preferredHeight: 32
+                verticalAlignment: Text.AlignVCenter
             }
 
             GridLayout {
@@ -67,76 +70,89 @@ Item {
                 color: Theme.panelRaised
                 border.width: 1
                 border.color: Theme.border
+                clip: true
 
-                ColumnLayout {
+                ScrollView {
+                    id: tokenUsageScroll
                     anchors.fill: parent
                     anchors.margins: 18
-                    spacing: 18
+                    clip: true
+                    contentWidth: availableWidth
+                    ScrollBar.horizontal: StyledScrollBar {
+                        policy: ScrollBar.AlwaysOff
+                    }
+                    ScrollBar.vertical: StyledScrollBar {
+                        policy: ScrollBar.AsNeeded
+                    }
 
-                    Repeater {
-                        model: profileManager.tokenUsage
+                    ColumnLayout {
+                        width: tokenUsageScroll.availableWidth
+                        spacing: 18
 
-                        delegate: Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 78
-                            radius: Theme.cardRadius
-                            color: modelData.active ? "#1d2425" : "transparent"
-                            border.width: 1
-                            border.color: modelData.active ? Theme.borderStrong : Theme.border
+                        Repeater {
+                            model: profileManager.tokenUsage
 
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 14
-                                spacing: 10
+                            delegate: Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 78
+                                radius: Theme.cardRadius
+                                color: modelData.active ? Theme.selected : "transparent"
+                                border.width: 1
+                                border.color: modelData.active ? Theme.borderStrong : Theme.border
 
-                                RowLayout {
-                                    Layout.fillWidth: true
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 14
+                                    spacing: 10
 
-                                    Text {
-                                        text: modelData.name
-                                        color: Theme.text
-                                        font.pixelSize: 14
-                                        font.weight: Font.Bold
+                                    RowLayout {
                                         Layout.fillWidth: true
-                                        elide: Text.ElideRight
-                                    }
 
-                                    Text {
-                                        text: page.formatNumber(modelData.tokens) + " / " + page.formatNumber(modelData.limit)
-                                        color: Theme.muted
-                                        font.pixelSize: 12
-                                        font.weight: Font.DemiBold
-                                    }
-                                }
+                                        Text {
+                                            text: modelData.name
+                                            color: Theme.text
+                                            font.pixelSize: 14
+                                            font.weight: Font.Bold
+                                            Layout.fillWidth: true
+                                            elide: Text.ElideRight
+                                        }
 
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 8
-                                    radius: 4
-                                    color: Theme.panel
+                                        Text {
+                                            text: page.formatNumber(modelData.tokens) + " / " + page.formatNumber(modelData.limit)
+                                            color: Theme.muted
+                                            font.pixelSize: 12
+                                            font.weight: Font.DemiBold
+                                            Layout.preferredWidth: 180
+                                            horizontalAlignment: Text.AlignRight
+                                            elide: Text.ElideRight
+                                        }
+                                    }
 
                                     Rectangle {
-                                        anchors.left: parent.left
-                                        anchors.top: parent.top
-                                        anchors.bottom: parent.bottom
-                                        width: Math.max(8, parent.width * Math.min(1.0, modelData.ratio))
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 8
                                         radius: 4
-                                        color: modelData.active ? Theme.accent : Theme.success
+                                        color: Theme.panel
 
-                                        Behavior on width {
-                                            NumberAnimation {
-                                                duration: 220
-                                                easing.type: Easing.OutCubic
+                                        Rectangle {
+                                            anchors.left: parent.left
+                                            anchors.top: parent.top
+                                            anchors.bottom: parent.bottom
+                                            width: modelData.ratio <= 0 ? 0 : Math.max(8, parent.width * Math.min(1.0, modelData.ratio))
+                                            radius: 4
+                                            color: modelData.active ? Theme.accent : Theme.success
+
+                                            Behavior on width {
+                                                NumberAnimation {
+                                                    duration: 220
+                                                    easing.type: Easing.OutCubic
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-
-                    Item {
-                        Layout.fillHeight: true
                     }
                 }
             }

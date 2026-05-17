@@ -7,9 +7,22 @@ Item {
     id: page
 
     property int settingsTab: 0
-    readonly property var agentTypes: ["Codex", "Claude"]
-    readonly property var providers: ["OpenAI", "Anthropic", "Custom"]
-    readonly property var efforts: ["low", "medium", "high", "xhigh"]
+    property string settingsMessage: ""
+
+    readonly property int navWidth: 248
+    readonly property int maxContentWidth: 760
+    readonly property var themes: ["Dark", "Light"]
+    readonly property var densities: ["Comfortable", "Compact"]
+    readonly property var backupWindows: ["7 days", "14 days", "30 days"]
+    readonly property var accentColors: [Theme.accentBlue, Theme.accentGreen, Theme.accentAmber]
+    readonly property var accentNames: ["Blue", "Green", "Amber"]
+
+    function displayMessage() {
+        if (settingsMessage.length > 0) {
+            return settingsMessage
+        }
+        return settingsManager.statusMessage.length > 0 ? settingsManager.statusMessage : "Settings are local"
+    }
 
     function indexFor(values, value) {
         for (var i = 0; i < values.length; ++i) {
@@ -20,40 +33,24 @@ Item {
         return 0
     }
 
-    function loadProfile() {
-        var profile = profileManager.currentProfile
-        profileNameField.text = profile.name || ""
-        agentTypeBox.currentIndex = indexFor(agentTypes, profile.agentType || "Codex")
-        providerBox.currentIndex = indexFor(providers, profile.modelProvider || "OpenAI")
-        modelField.text = profile.model || ""
-        effortBox.currentIndex = indexFor(efforts, profile.reasoningEffort || "high")
-        baseUrlField.text = profile.baseUrl || ""
-        apiKeyField.text = profile.maskedApiKey || ""
-        httpProxyField.text = profile.httpProxy || ""
-        httpsProxyField.text = profile.httpsProxy || ""
-    }
-
-    function saveProfile() {
-        profileManager.saveConfiguration(
-                    profileNameField.text,
-                    agentTypeBox.currentText,
-                    providerBox.currentText,
-                    modelField.text,
-                    effortBox.currentText,
-                    baseUrlField.text,
-                    apiKeyField.text,
-                    httpProxyField.text,
-                    httpsProxyField.text)
-    }
-
-    Component.onCompleted: loadProfile()
-
-    Connections {
-        target: profileManager
-
-        function onCurrentProfileChanged() {
-            page.loadProfile()
+    function tabTitle() {
+        if (settingsTab === 1) {
+            return "Behavior"
         }
+        if (settingsTab === 2) {
+            return "Storage & Privacy"
+        }
+        return "Appearance"
+    }
+
+    function tabDetail() {
+        if (settingsTab === 1) {
+            return "Startup, restore, and confirmation preferences."
+        }
+        if (settingsTab === 2) {
+            return "Local data, backups, and secret visibility."
+        }
+        return "Theme, density, and accent preferences."
     }
 
     Rectangle {
@@ -65,25 +62,27 @@ Item {
 
         RowLayout {
             anchors.fill: parent
-            anchors.margins: 28
+            anchors.margins: 26
             spacing: 24
 
             ColumnLayout {
                 Layout.fillHeight: true
-                Layout.preferredWidth: 200
-                spacing: 8
+                Layout.preferredWidth: page.navWidth
+                Layout.maximumWidth: page.navWidth
+                spacing: 10
 
                 Text {
-                    text: "CONFIGURATION"
+                    text: "SOFTWARE"
                     color: Theme.muted
                     font.pixelSize: 10
                     font.weight: Font.Bold
-                    Layout.leftMargin: 10
-                    Layout.topMargin: 2
+                    Layout.leftMargin: 12
+                    Layout.preferredHeight: 18
+                    verticalAlignment: Text.AlignVCenter
                 }
 
                 SettingsNavItem {
-                    text: "General Settings"
+                    text: "Appearance"
                     iconName: "sliders-horizontal"
                     selected: page.settingsTab === 0
                     Layout.fillWidth: true
@@ -91,16 +90,16 @@ Item {
                 }
 
                 SettingsNavItem {
-                    text: "Authentication"
-                    iconName: "key-round"
+                    text: "Behavior"
+                    iconName: "activity"
                     selected: page.settingsTab === 1
                     Layout.fillWidth: true
                     onClicked: page.settingsTab = 1
                 }
 
                 SettingsNavItem {
-                    text: "Network & Proxy"
-                    iconName: "network"
+                    text: "Storage & Privacy"
+                    iconName: "shield-check"
                     selected: page.settingsTab === 2
                     Layout.fillWidth: true
                     onClicked: page.settingsTab = 2
@@ -114,7 +113,7 @@ Item {
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.maximumWidth: 620
+                Layout.maximumWidth: page.maxContentWidth
                 spacing: 18
 
                 Column {
@@ -122,218 +121,531 @@ Item {
                     spacing: 8
 
                     Text {
-                        text: page.settingsTab === 0 ? "General Settings" : (page.settingsTab === 1 ? "Authentication" : "Network & Proxy")
+                        text: page.tabTitle()
                         color: Theme.text
                         font.pixelSize: 22
                         font.weight: Font.Bold
                         width: parent.width
+                        height: 28
+                        verticalAlignment: Text.AlignVCenter
                         elide: Text.ElideRight
                     }
 
                     Text {
-                        text: page.settingsTab === 0
-                              ? "Manage agent type, model provider, and run behavior."
-                              : (page.settingsTab === 1 ? "Manage credentials and provider endpoint." : "Manage local proxy routing.")
+                        text: page.tabDetail()
                         color: Theme.muted
                         font.pixelSize: 12
                         width: parent.width
+                        height: 18
+                        verticalAlignment: Text.AlignVCenter
                         elide: Text.ElideRight
                     }
                 }
 
                 ScrollView {
-                    id: formScroll
+                    id: settingsScroll
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     clip: true
                     contentWidth: availableWidth
-                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-                    ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                    ScrollBar.horizontal: StyledScrollBar {
+                        policy: ScrollBar.AlwaysOff
+                    }
+                    ScrollBar.vertical: StyledScrollBar {
+                        policy: ScrollBar.AsNeeded
+                    }
 
                     StackLayout {
-                        id: settingsStack
                         currentIndex: page.settingsTab
-                        width: formScroll.availableWidth
-                        height: Math.max(implicitHeight, formScroll.availableHeight)
+                        width: settingsScroll.availableWidth
+                        height: Math.max(implicitHeight, settingsScroll.availableHeight)
 
                         ColumnLayout {
-                            spacing: 16
+                            spacing: 12
 
-                            Column {
+                            Rectangle {
                                 Layout.fillWidth: true
-                                spacing: 8
+                                Layout.preferredHeight: 74
+                                radius: Theme.cardRadius
+                                color: Theme.panelRaised
+                                border.width: 1
+                                border.color: Theme.border
 
-                                Text {
-                                    text: "Profile Name"
-                                    color: Theme.text
-                                    font.pixelSize: 12
-                                    font.weight: Font.DemiBold
-                                }
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 18
 
-                                FormTextField {
-                                    id: profileNameField
-                                    Layout.fillWidth: true
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        Text {
+                                            text: "Color Theme"
+                                            color: Theme.text
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Text {
+                                            text: themeBox.currentText
+                                            color: Theme.muted
+                                            font.pixelSize: 12
+                                        }
+                                    }
+
+                                    FormComboBox {
+                                        id: themeBox
+                                        Layout.preferredWidth: 180
+                                        model: page.themes
+                                        currentIndex: settingsManager.darkTheme ? 0 : 1
+                                        onActivated: function(index) {
+                                            settingsManager.darkTheme = index === 0
+                                            page.settingsMessage = settingsManager.darkTheme ? "Dark theme enabled" : "Light theme enabled"
+                                        }
+                                    }
                                 }
                             }
 
-                            Column {
+                            Rectangle {
                                 Layout.fillWidth: true
-                                spacing: 8
+                                Layout.preferredHeight: 74
+                                radius: Theme.cardRadius
+                                color: Theme.panelRaised
+                                border.width: 1
+                                border.color: Theme.border
 
-                                Text {
-                                    text: "Agent Type"
-                                    color: Theme.text
-                                    font.pixelSize: 12
-                                    font.weight: Font.DemiBold
-                                }
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 18
 
-                                FormComboBox {
-                                    id: agentTypeBox
-                                    Layout.fillWidth: true
-                                    model: page.agentTypes
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        Text {
+                                            text: "Interface Density"
+                                            color: Theme.text
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Text {
+                                            text: densityBox.currentText
+                                            color: Theme.muted
+                                            font.pixelSize: 12
+                                        }
+                                    }
+
+                                    FormComboBox {
+                                        id: densityBox
+                                        Layout.preferredWidth: 180
+                                        model: page.densities
+                                        currentIndex: page.indexFor(page.densities, settingsManager.density)
+                                        onActivated: function(index) {
+                                            settingsManager.density = page.densities[index]
+                                            page.settingsMessage = page.densities[index] + " density enabled"
+                                        }
+                                    }
                                 }
                             }
 
-                            Column {
+                            Rectangle {
                                 Layout.fillWidth: true
-                                spacing: 8
+                                Layout.preferredHeight: 74
+                                radius: Theme.cardRadius
+                                color: Theme.panelRaised
+                                border.width: 1
+                                border.color: Theme.border
 
-                                Text {
-                                    text: "Model Provider"
-                                    color: Theme.text
-                                    font.pixelSize: 12
-                                    font.weight: Font.DemiBold
-                                }
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 18
 
-                                FormComboBox {
-                                    id: providerBox
-                                    Layout.fillWidth: true
-                                    model: page.providers
-                                }
-                            }
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 6
 
-                            Column {
-                                Layout.fillWidth: true
-                                spacing: 8
+                                        Text {
+                                            text: "Accent Color"
+                                            color: Theme.text
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
 
-                                Text {
-                                    text: "Model"
-                                    color: Theme.text
-                                    font.pixelSize: 12
-                                    font.weight: Font.DemiBold
-                                }
+                                        Text {
+                                            text: page.accentNames[Theme.accentIndex]
+                                            color: Theme.muted
+                                            font.pixelSize: 12
+                                        }
+                                    }
 
-                                FormTextField {
-                                    id: modelField
-                                    Layout.fillWidth: true
-                                }
-                            }
+                                    Row {
+                                        spacing: 10
+                                        Layout.preferredWidth: 118
+                                        Layout.preferredHeight: 28
 
-                            Column {
-                                Layout.fillWidth: true
-                                spacing: 8
+                                        Repeater {
+                                            model: page.accentColors
 
-                                Text {
-                                    text: "Reasoning Effort"
-                                    color: Theme.text
-                                    font.pixelSize: 12
-                                    font.weight: Font.DemiBold
-                                }
+                                            Rectangle {
+                                                width: 28
+                                                height: 28
+                                                radius: 14
+                                                color: modelData
+                                                border.width: Theme.accentIndex === index ? 2 : 1
+                                                border.color: Theme.accentIndex === index ? Theme.text : Theme.border
 
-                                FormComboBox {
-                                    id: effortBox
-                                    Layout.fillWidth: true
-                                    model: page.efforts
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        settingsManager.accentIndex = index
+                                                        page.settingsMessage = page.accentNames[index] + " accent enabled"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
 
                         ColumnLayout {
-                            spacing: 16
+                            spacing: 12
 
-                            Column {
+                            Rectangle {
                                 Layout.fillWidth: true
-                                spacing: 8
+                                Layout.preferredHeight: 74
+                                radius: Theme.cardRadius
+                                color: Theme.panelRaised
+                                border.width: 1
+                                border.color: Theme.border
 
-                                Text {
-                                    text: "Base URL"
-                                    color: Theme.text
-                                    font.pixelSize: 12
-                                    font.weight: Font.DemiBold
-                                }
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 18
 
-                                FormTextField {
-                                    id: baseUrlField
-                                    Layout.fillWidth: true
-                                    placeholderText: "https://api.openai.com/v1"
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        Text {
+                                            text: "Launch at Login"
+                                            color: Theme.text
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Text {
+                                            text: settingsManager.launchAtLogin ? "On" : "Off"
+                                            color: Theme.muted
+                                            font.pixelSize: 12
+                                        }
+                                    }
+
+                                    ToggleSwitch {
+                                        checked: settingsManager.launchAtLogin
+                                        onToggled: {
+                                            settingsManager.launchAtLogin = checked
+                                            page.settingsMessage = checked ? "Launch at login enabled" : "Launch at login disabled"
+                                        }
+                                    }
                                 }
                             }
 
-                            Column {
+                            Rectangle {
                                 Layout.fillWidth: true
-                                spacing: 8
+                                Layout.preferredHeight: 74
+                                radius: Theme.cardRadius
+                                color: Theme.panelRaised
+                                border.width: 1
+                                border.color: Theme.border
 
-                                Text {
-                                    text: "API Key"
-                                    color: Theme.text
-                                    font.pixelSize: 12
-                                    font.weight: Font.DemiBold
-                                }
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 18
 
-                                FormTextField {
-                                    id: apiKeyField
-                                    Layout.fillWidth: true
-                                    secret: true
-                                    placeholderText: "sk-..."
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        Text {
+                                            text: "Restore Last Section"
+                                            color: Theme.text
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Text {
+                                            text: settingsManager.restoreLastSection ? "On" : "Off"
+                                            color: Theme.muted
+                                            font.pixelSize: 12
+                                        }
+                                    }
+
+                                    ToggleSwitch {
+                                        checked: settingsManager.restoreLastSection
+                                        onToggled: {
+                                            settingsManager.restoreLastSection = checked
+                                            page.settingsMessage = checked ? "Last section restore enabled" : "Last section restore disabled"
+                                        }
+                                    }
                                 }
                             }
 
-                            Item {
-                                Layout.fillHeight: true
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 74
+                                radius: Theme.cardRadius
+                                color: Theme.panelRaised
+                                border.width: 1
+                                border.color: Theme.border
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 18
+
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        Text {
+                                            text: "Confirm Profile Deletion"
+                                            color: Theme.text
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Text {
+                                            text: settingsManager.confirmProfileDeletion ? "Required" : "Off"
+                                            color: Theme.muted
+                                            font.pixelSize: 12
+                                        }
+                                    }
+
+                                    ToggleSwitch {
+                                        checked: settingsManager.confirmProfileDeletion
+                                        enabled: false
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 74
+                                radius: Theme.cardRadius
+                                color: Theme.panelRaised
+                                border.width: 1
+                                border.color: Theme.border
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 18
+
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        Text {
+                                            text: "Health Check on Activate"
+                                            color: Theme.text
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Text {
+                                            text: settingsManager.healthCheckOnActivate ? "On" : "Off"
+                                            color: Theme.muted
+                                            font.pixelSize: 12
+                                        }
+                                    }
+
+                                    ToggleSwitch {
+                                        checked: settingsManager.healthCheckOnActivate
+                                        onToggled: {
+                                            settingsManager.healthCheckOnActivate = checked
+                                            page.settingsMessage = checked ? "Health check on activate enabled" : "Health check on activate disabled"
+                                        }
+                                    }
+                                }
                             }
                         }
 
                         ColumnLayout {
-                            spacing: 16
+                            spacing: 12
 
-                            Column {
+                            Rectangle {
                                 Layout.fillWidth: true
-                                spacing: 8
+                                Layout.preferredHeight: 74
+                                radius: Theme.cardRadius
+                                color: Theme.panelRaised
+                                border.width: 1
+                                border.color: Theme.border
 
-                                Text {
-                                    text: "HTTP Proxy"
-                                    color: Theme.text
-                                    font.pixelSize: 12
-                                    font.weight: Font.DemiBold
-                                }
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 18
 
-                                FormTextField {
-                                    id: httpProxyField
-                                    Layout.fillWidth: true
-                                    placeholderText: "http://127.0.0.1:2080"
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        Text {
+                                            text: "Data Location"
+                                            color: Theme.text
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Text {
+                                            text: settingsManager.dataLocation
+                                            color: Theme.muted
+                                            font.pixelSize: 12
+                                            width: parent.width
+                                            elide: Text.ElideMiddle
+                                        }
+                                    }
+
+                                    ActionButton {
+                                        text: "Reveal"
+                                        iconName: "file-cog"
+                                        onClicked: page.settingsMessage = settingsManager.settingsPath
+                                    }
                                 }
                             }
 
-                            Column {
+                            Rectangle {
                                 Layout.fillWidth: true
-                                spacing: 8
+                                Layout.preferredHeight: 74
+                                radius: Theme.cardRadius
+                                color: Theme.panelRaised
+                                border.width: 1
+                                border.color: Theme.border
 
-                                Text {
-                                    text: "HTTPS Proxy"
-                                    color: Theme.text
-                                    font.pixelSize: 12
-                                    font.weight: Font.DemiBold
-                                }
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 18
 
-                                FormTextField {
-                                    id: httpsProxyField
-                                    Layout.fillWidth: true
-                                    placeholderText: "http://127.0.0.1:2080"
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        Text {
+                                            text: "Mask Secrets"
+                                            color: Theme.text
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Text {
+                                            text: settingsManager.maskSecrets ? "On" : "Off"
+                                            color: Theme.muted
+                                            font.pixelSize: 12
+                                        }
+                                    }
+
+                                    ToggleSwitch {
+                                        checked: settingsManager.maskSecrets
+                                        onToggled: {
+                                            settingsManager.maskSecrets = checked
+                                            page.settingsMessage = checked ? "Secret masking enabled" : "Secret masking disabled"
+                                        }
+                                    }
                                 }
                             }
 
-                            Item {
-                                Layout.fillHeight: true
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 74
+                                radius: Theme.cardRadius
+                                color: Theme.panelRaised
+                                border.width: 1
+                                border.color: Theme.border
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 18
+
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        Text {
+                                            text: "Local Backups"
+                                            color: Theme.text
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Text {
+                                            text: settingsManager.keepBackups ? "On" : "Off"
+                                            color: Theme.muted
+                                            font.pixelSize: 12
+                                        }
+                                    }
+
+                                    ToggleSwitch {
+                                        checked: settingsManager.keepBackups
+                                        onToggled: {
+                                            settingsManager.keepBackups = checked
+                                            page.settingsMessage = checked ? "Local backups enabled" : "Local backups disabled"
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 74
+                                radius: Theme.cardRadius
+                                color: Theme.panelRaised
+                                border.width: 1
+                                border.color: Theme.border
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 18
+
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        Text {
+                                            text: "Backup Retention"
+                                            color: Theme.text
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Text {
+                                            text: backupWindowBox.currentText
+                                            color: Theme.muted
+                                            font.pixelSize: 12
+                                        }
+                                    }
+
+                                    FormComboBox {
+                                        id: backupWindowBox
+                                        Layout.preferredWidth: 180
+                                        model: page.backupWindows
+                                        currentIndex: page.indexFor(page.backupWindows, settingsManager.backupRetention)
+                                        onActivated: function(index) {
+                                            settingsManager.backupRetention = page.backupWindows[index]
+                                            page.settingsMessage = page.backupWindows[index] + " backup retention enabled"
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -349,21 +661,29 @@ Item {
                     Layout.fillWidth: true
                     spacing: 10
 
-                    Item {
+                    Text {
+                        text: page.displayMessage()
+                        color: Theme.muted
+                        font.pixelSize: 12
                         Layout.fillWidth: true
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
                     }
 
                     ActionButton {
-                        text: "Cancel"
-                        iconName: "x"
-                        onClicked: page.loadProfile()
+                        text: "Clear Cache"
+                        iconName: "trash-2"
+                        onClicked: page.settingsMessage = "Cache cleared"
                     }
 
                     ActionButton {
-                        text: "Save Configuration"
+                        text: "Save Settings"
                         iconName: "save"
                         variant: "primary"
-                        onClicked: page.saveProfile()
+                        onClicked: {
+                            settingsManager.save()
+                            page.settingsMessage = settingsManager.statusMessage
+                        }
                     }
                 }
 
@@ -373,7 +693,7 @@ Item {
             }
 
             Item {
-                Layout.fillWidth: true
+                Layout.preferredWidth: Math.max(0, parent.width - page.navWidth - page.maxContentWidth - 48)
                 Layout.fillHeight: true
             }
         }

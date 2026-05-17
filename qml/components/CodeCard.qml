@@ -8,32 +8,34 @@ Rectangle {
     property string iconName: ""
     property string title: ""
     property var lines: []
+    property int matchedLineCount: lines.length
 
     Layout.fillWidth: true
-    Layout.preferredHeight: 128
+    Layout.preferredHeight: Math.max(148, 80 + card.matchedLineCount * 20)
     radius: Theme.cardRadius
     color: Theme.panelRaised
     border.width: 1
     border.color: Theme.border
 
-    Column {
+    ColumnLayout {
         anchors.fill: parent
         anchors.margins: 18
         spacing: 14
 
-        Row {
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 20
             spacing: 10
 
             Item {
-                width: 18
-                height: 18
-                anchors.verticalCenter: parent.verticalCenter
+                Layout.preferredWidth: 18
+                Layout.preferredHeight: 18
 
                 Icon {
                     anchors.centerIn: parent
                     name: card.iconName
                     size: 16
-                    color: Theme.text
+                    color: Theme.icon
                 }
             }
 
@@ -42,24 +44,38 @@ Rectangle {
                 color: Theme.text
                 font.pixelSize: 14
                 font.weight: Font.Bold
-                anchors.verticalCenter: parent.verticalCenter
+                Layout.fillWidth: true
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideRight
             }
         }
 
-        Column {
-            width: parent.width
-            spacing: 8
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            radius: 6
+            color: Theme.controlDisabled
+            border.width: 1
+            border.color: Theme.border
 
-            Repeater {
-                model: card.lines
+            Column {
+                anchors.fill: parent
+                anchors.margins: 12
+                spacing: 8
 
-                Text {
-                    width: parent.width
-                    text: modelData
-                    color: Theme.text
-                    font.family: "monospace"
-                    font.pixelSize: 12
-                    elide: Text.ElideRight
+                Repeater {
+                    model: card.lines
+
+                    Text {
+                        width: parent.width
+                        height: 12
+                        text: modelData
+                        color: modelData.length > 0 ? Theme.text : Theme.dim
+                        font.family: "monospace"
+                        font.pixelSize: 12
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
                 }
             }
         }

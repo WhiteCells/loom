@@ -1,9 +1,12 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import Loom
 
 Item {
     id: page
+
+    readonly property int tableRowHeight: 50
 
     function formatNumber(value) {
         return Number(value).toLocaleString(Qt.locale("en_US"), "f", 0)
@@ -27,6 +30,8 @@ Item {
                 font.pixelSize: 28
                 font.weight: Font.Bold
                 Layout.fillWidth: true
+                Layout.preferredHeight: 34
+                verticalAlignment: Text.AlignVCenter
             }
 
             GridLayout {
@@ -91,8 +96,10 @@ Item {
                             color: Theme.muted
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
-                            Layout.fillWidth: true
+                            Layout.preferredWidth: 170
+                            Layout.minimumWidth: 120
                             Layout.leftMargin: 16
+                            verticalAlignment: Text.AlignVCenter
                         }
 
                         Text {
@@ -102,6 +109,7 @@ Item {
                             font.weight: Font.DemiBold
                             Layout.fillWidth: true
                             Layout.preferredWidth: parent.width * 0.32
+                            verticalAlignment: Text.AlignVCenter
                         }
 
                         Text {
@@ -109,7 +117,8 @@ Item {
                             color: Theme.muted
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
-                            Layout.fillWidth: true
+                            Layout.preferredWidth: 118
+                            verticalAlignment: Text.AlignVCenter
                         }
 
                         Text {
@@ -117,8 +126,10 @@ Item {
                             color: Theme.muted
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
-                            Layout.fillWidth: true
+                            Layout.preferredWidth: 94
                             Layout.rightMargin: 16
+                            horizontalAlignment: Text.AlignRight
+                            verticalAlignment: Text.AlignVCenter
                         }
                     }
 
@@ -128,68 +139,89 @@ Item {
                         color: Theme.border
                     }
 
-                    Repeater {
-                        model: profileManager.healthChecks.slice(0, 4)
+                    ScrollView {
+                        id: recentChecksScroll
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        clip: true
+                        contentWidth: availableWidth
+                        ScrollBar.horizontal: StyledScrollBar {
+                            policy: ScrollBar.AlwaysOff
+                        }
+                        ScrollBar.vertical: StyledScrollBar {
+                            policy: ScrollBar.AsNeeded
+                        }
 
-                        delegate: Item {
-                            Layout.fillWidth: true
-                            height: 50
+                        ColumnLayout {
+                            width: recentChecksScroll.availableWidth
+                            spacing: 0
 
-                            RowLayout {
-                                anchors.fill: parent
-                                spacing: 0
+                            Repeater {
+                                model: profileManager.healthChecks
 
-                                Text {
-                                    text: modelData.profile
-                                    color: Theme.text
-                                    font.pixelSize: 12
-                                    font.weight: Font.DemiBold
+                                delegate: Item {
                                     Layout.fillWidth: true
-                                    Layout.leftMargin: 16
-                                    elide: Text.ElideRight
-                                }
+                                    Layout.preferredHeight: page.tableRowHeight
+                                    implicitHeight: page.tableRowHeight
 
-                                Text {
-                                    text: modelData.endpoint
-                                    color: Theme.muted
-                                    font.pixelSize: 12
-                                    Layout.fillWidth: true
-                                    Layout.preferredWidth: parent.width * 0.32
-                                    elide: Text.ElideRight
-                                }
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        spacing: 0
 
-                                Item {
-                                    Layout.fillWidth: true
-                                    Pill {
-                                        text: modelData.status
-                                        iconName: modelData.status === "OK" ? "check" : "triangle-alert"
-                                        fill: modelData.status === "OK" ? Theme.successSoft : "#45320d"
-                                        foreground: modelData.status === "OK" ? Theme.success : Theme.warning
-                                        anchors.verticalCenter: parent.verticalCenter
+                                        Text {
+                                            text: modelData.profile
+                                            color: Theme.text
+                                            font.pixelSize: 12
+                                            font.weight: Font.DemiBold
+                                            Layout.preferredWidth: 170
+                                            Layout.minimumWidth: 120
+                                            Layout.leftMargin: 16
+                                            verticalAlignment: Text.AlignVCenter
+                                            elide: Text.ElideRight
+                                        }
+
+                                        Text {
+                                            text: modelData.endpoint
+                                            color: Theme.muted
+                                            font.pixelSize: 12
+                                            Layout.fillWidth: true
+                                            Layout.preferredWidth: parent.width * 0.32
+                                            verticalAlignment: Text.AlignVCenter
+                                            elide: Text.ElideRight
+                                        }
+
+                                        Item {
+                                            Layout.preferredWidth: 118
+                                            Pill {
+                                                text: modelData.status
+                                                iconName: modelData.status === "OK" ? "check" : "triangle-alert"
+                                                fill: modelData.status === "OK" ? Theme.successSoft : Theme.warningSoft
+                                                foreground: modelData.status === "OK" ? Theme.success : Theme.warning
+                                                anchors.verticalCenter: parent.verticalCenter
+                                            }
+                                        }
+
+                                        Text {
+                                            text: modelData.latency
+                                            color: Theme.muted
+                                            font.pixelSize: 12
+                                            Layout.preferredWidth: 94
+                                            Layout.rightMargin: 16
+                                            horizontalAlignment: Text.AlignRight
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.bottom: parent.bottom
+                                        height: 1
+                                        color: Theme.border
                                     }
                                 }
-
-                                Text {
-                                    text: modelData.latency
-                                    color: Theme.muted
-                                    font.pixelSize: 12
-                                    Layout.fillWidth: true
-                                    Layout.rightMargin: 16
-                                }
-                            }
-
-                            Rectangle {
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.bottom: parent.bottom
-                                height: 1
-                                color: Theme.border
                             }
                         }
-                    }
-
-                    Item {
-                        Layout.fillHeight: true
                     }
                 }
             }

@@ -6,11 +6,40 @@ import Loom
 Item {
     id: page
 
+    readonly property int sideWidth: 284
+    readonly property int contentMargin: 22
+    readonly property int editorHorizontalPadding: 24
+    readonly property int editorFieldHeight: 68
+    property string profileQuery: ""
+    property bool editorCreating: false
+    property bool deleteClosesEditor: false
+    property string deleteProfileName: ""
+    property string editorWarning: ""
+    property var editorModelOptions: ["gpt-5.5", "gpt-5.4", "gpt-5.3-codex"]
+    property bool editorModelOptionsReady: false
+    property string editorModelMessage: "Enter an endpoint to load model options."
+    readonly property var providers: ["OpenAI", "Anthropic", "Custom"]
+    readonly property var efforts: ["low", "medium", "high", "xhigh"]
+    readonly property var wireApis: ["responses", "chat"]
+    readonly property var openAiModels: ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.2"]
+    readonly property var anthropicModels: ["claude-sonnet-4.5", "claude-opus-4.1", "claude-haiku-4.5"]
+    readonly property var customModels: ["custom-model"]
+    readonly property int previewLineCount: Math.max(page.configLines(profileManager.currentProfile).length,
+                                                     page.authLines(profileManager.currentProfile).length,
+                                                     page.envLines(profileManager.currentProfile).length)
+
     function configLines(profile) {
         return [
             "model_provider = \"" + profile.modelProvider + "\"",
             "model = \"" + profile.model + "\"",
-            "model_reasoning_effort = \"" + profile.reasoningEffort + "\""
+            "model_reasoning_effort = \"" + profile.reasoningEffort + "\"",
+            "disable_response_storage = " + (profile.disableResponseStorage ? "true" : "false"),
+            "",
+            "[model_providers." + profile.modelProvider + "]",
+            "name = \"" + profile.modelProvider + "\"",
+            "base_url = \"" + profile.baseUrl + "\"",
+            "wire_api = \"" + profile.wireApi + "\"",
+            "requires_openai_auth = " + (profile.requiresOpenAiAuth ? "true" : "false")
         ]
     }
 
@@ -19,6 +48,275 @@ Item {
             "\"auth_mode\": \"apikey\"",
             "\"OPENAI_API_KEY\": \"" + profile.maskedApiKey + "\""
         ]
+    }
+
+    function envLines(profile) {
+        var lines = []
+        if (profile.httpProxy && profile.httpProxy.length > 0) {
+            lines.push("HTTP_PROXY=\"" + profile.httpProxy + "\"")
+        }
+        if (profile.httpsProxy && profile.httpsProxy.length > 0) {
+            lines.push("HTTPS_PROXY=\"" + profile.httpsProxy + "\"")
+        }
+        return lines.length > 0 ? lines : ["# No proxy configured"]
+    }
+
+    function displayHost(url) {
+        var value = (url || "").trim()
+        if (value.length === 0) {
+            return "Not configured"
+        }
+
+        value = value.replace(/^https?:\/\//, "")
+        var slash = value.indexOf("/")
+        return slash === -1 ? value : value.substring(0, slash)
+    }
+
+    function displayPath(url) {
+        var value = (url || "").trim().replace(/^https?:\/\//, "")
+        var slash = value.indexOf("/")
+        return slash === -1 ? "/" : value.substring(slash)
+    }
+
+    function proxyLabel(value) {
+        return value && value.length > 0 ? value : "Disabled"
+    }
+
+    function proxyDetail(value) {
+        return value && value.length > 0 ? "Enabled" : "Direct"
+    }
+
+    function filteredProfiles() {
+        var source = profileManager.profiles
+        var query = page.profileQuery.trim().toLowerCase()
+        if (query.length === 0) {
+            return source
+        }
+
+        var result = []
+        for (var i = 0; i < source.length; ++i) {
+            var profile = source[i]
+            var haystack = [
+                profile.name,
+                profile.agentType,
+                profile.modelProvider,
+                profile.model,
+                profile.baseUrl
+            ].join(" ").toLowerCase()
+
+            if (haystack.indexOf(query) !== -1) {
+                result.push(profile)
+            }
+        }
+        return result
+    }
+
+    function indexFor(values, value) {
+        for (var i = 0; i < values.length; ++i) {
+            if (values[i] === value) {
+                return i
+            }
+        }
+        return 0
+    }
+
+    function cleanEndpoint(endpoint) {
+        return (endpoint || "").trim()
+    }
+
+    function providerForEndpoint(endpoint, fallbackProvider) {
+        var normalized = page.cleanEndpoint(endpoint).toLowerCase()
+        if (normalized.indexOf("anthropic") !== -1) {
+            return "Anthropic"
+        }
+        if (normalized.indexOf("openai") !== -1) {
+            return "OpenAI"
+        }
+        return fallbackProvider && fallbackProvider.length > 0 ? fallbackProvider : "Custom"
+    }
+
+    function agentTypeForProvider(provider) {
+        return provider === "Anthropic" ? "Claude" : "Codex"
+    }
+
+    function modelOptionsForProvider(provider, preferredModel) {
+        var result = page.customModels.slice()
+        if (provider === "Anthropic") {
+            result = page.anthropicModels.slice()
+        } else if (provider === "OpenAI") {
+            result = page.openAiModels.slice()
+        } else if (preferredModel && preferredModel.trim().length > 0) {
+            result = [preferredModel.trim()]
+        }
+
+        var preferred = preferredModel ? preferredModel.trim() : ""
+        if (preferred.length > 0 && result.indexOf(preferred) === -1) {
+            result.unshift(preferred)
+        }
+        return result
+    }
+
+    function refreshEditorModelOptions(preferredModel) {
+        var endpoint = page.cleanEndpoint(editorBaseUrlField.text)
+        if (endpoint.length === 0) {
+            page.editorModelOptions = []
+            editorModelBox.currentIndex = -1
+            page.editorModelMessage = "Endpoint required before loading model options."
+            return
+        }
+
+        var provider = page.providerForEndpoint(endpoint, editorProviderBox.currentText)
+        editorProviderBox.currentIndex = page.indexFor(page.providers, provider)
+
+        var options = page.modelOptionsForProvider(provider, preferredModel || "")
+        var target = preferredModel && preferredModel.trim().length > 0 ? preferredModel.trim() : options[0]
+        page.editorModelOptions = options
+        editorModelBox.currentIndex = page.indexFor(options, target)
+        page.editorModelOptionsReady = true
+        page.editorModelMessage = provider + " model options loaded"
+    }
+
+    function markEndpointChanged() {
+        page.editorModelOptionsReady = false
+        page.editorModelMessage = page.cleanEndpoint(editorBaseUrlField.text).length === 0
+                ? "Endpoint required before loading model options."
+                : "Endpoint changed. Load options before choosing a model."
+    }
+
+    function saveCurrentInterfaceConfig() {
+        settingsManager.saveInterfaceConfig(
+                    editorNameField.text,
+                    editorProviderBox.currentText,
+                    editorModelBox.currentText,
+                    editorEffortBox.currentText,
+                    editorBaseUrlField.text,
+                    editorHttpProxyField.text,
+                    editorHttpsProxyField.text,
+                    editorStorageSwitch.checked,
+                    editorWireApiBox.currentText,
+                    editorOpenAiAuthSwitch.checked)
+    }
+
+    function loadEditor() {
+        page.editorWarning = ""
+        if (page.editorCreating) {
+            var defaults = settingsManager.interfaceConfig
+            editorNameField.text = defaults.profileName || ""
+            editorProviderBox.currentIndex = page.indexFor(page.providers, defaults.modelProvider || "OpenAI")
+            editorBaseUrlField.text = defaults.baseUrl || "https://api.openai.com/v1"
+            editorApiKeyField.text = ""
+            editorApiKeyField.placeholderText = "sk-..."
+            editorHttpProxyField.text = defaults.httpProxy || ""
+            editorHttpsProxyField.text = defaults.httpsProxy || ""
+            editorStorageSwitch.checked = defaults.disableResponseStorage !== false
+            editorWireApiBox.currentIndex = page.indexFor(page.wireApis, defaults.wireApi || "responses")
+            editorOpenAiAuthSwitch.checked = defaults.requiresOpenAiAuth !== false
+            page.refreshEditorModelOptions(defaults.model || "gpt-5.5")
+            editorEffortBox.currentIndex = page.indexFor(page.efforts, defaults.reasoningEffort || "high")
+            return
+        }
+
+        var profile = profileManager.currentProfile
+        editorNameField.text = profile.name || ""
+        editorProviderBox.currentIndex = page.indexFor(page.providers, profile.modelProvider || "OpenAI")
+        editorBaseUrlField.text = profile.baseUrl || ""
+        editorApiKeyField.text = ""
+        editorApiKeyField.placeholderText = profile.maskedApiKey || "sk-..."
+        editorHttpProxyField.text = profile.httpProxy || ""
+        editorHttpsProxyField.text = profile.httpsProxy || ""
+        editorStorageSwitch.checked = profile.disableResponseStorage !== false
+        editorWireApiBox.currentIndex = page.indexFor(page.wireApis, profile.wireApi || "responses")
+        editorOpenAiAuthSwitch.checked = profile.requiresOpenAiAuth !== false
+        page.refreshEditorModelOptions(profile.model || "")
+        editorEffortBox.currentIndex = page.indexFor(page.efforts, profile.reasoningEffort || "high")
+    }
+
+    function openEditor(creating) {
+        page.editorCreating = creating
+        page.loadEditor()
+        profileEditor.open()
+        editorNameField.forceActiveFocus()
+    }
+
+    function createAndEditProfile() {
+        searchField.text = ""
+        page.profileQuery = ""
+        page.openEditor(true)
+    }
+
+    function saveEditor() {
+        page.editorWarning = ""
+        if (editorNameField.text.trim().length === 0) {
+            page.editorWarning = "Profile name is required."
+            editorNameField.forceActiveFocus()
+            return
+        }
+        if (editorNameField.text.indexOf("/") !== -1 || editorNameField.text.indexOf("\\") !== -1) {
+            page.editorWarning = "Profile name cannot contain / or \\."
+            editorNameField.forceActiveFocus()
+            return
+        }
+
+        var saved = false
+        if (page.editorCreating) {
+            saved = profileManager.createProfileWithConfiguration(
+                        editorNameField.text,
+                        page.agentTypeForProvider(editorProviderBox.currentText),
+                        editorProviderBox.currentText,
+                        editorModelBox.currentText,
+                        editorEffortBox.currentText,
+                        editorBaseUrlField.text,
+                        editorApiKeyField.text,
+                        editorHttpProxyField.text,
+                        editorHttpsProxyField.text,
+                        editorStorageSwitch.checked,
+                        editorWireApiBox.currentText,
+                        editorOpenAiAuthSwitch.checked)
+            if (saved) {
+                page.saveCurrentInterfaceConfig()
+                profileEditor.close()
+            } else {
+                page.editorWarning = profileManager.statusMessage
+            }
+            return
+        }
+
+        saved = profileManager.saveConfiguration(
+                    editorNameField.text,
+                    page.agentTypeForProvider(editorProviderBox.currentText),
+                    editorProviderBox.currentText,
+                    editorModelBox.currentText,
+                    editorEffortBox.currentText,
+                    editorBaseUrlField.text,
+                    editorApiKeyField.text,
+                    editorHttpProxyField.text,
+                    editorHttpsProxyField.text,
+                    editorStorageSwitch.checked,
+                    editorWireApiBox.currentText,
+                    editorOpenAiAuthSwitch.checked)
+        if (saved) {
+            page.saveCurrentInterfaceConfig()
+            profileEditor.close()
+        } else {
+            page.editorWarning = profileManager.statusMessage
+        }
+    }
+
+    function requestDeleteSelectedProfile(closeEditorAfterDelete) {
+        var profile = profileManager.currentProfile
+        page.deleteProfileName = profile.name || "Selected Profile"
+        page.deleteClosesEditor = closeEditorAfterDelete
+        deleteConfirmDialog.open()
+    }
+
+    function confirmDeleteSelectedProfile() {
+        profileManager.deleteSelectedProfile()
+        deleteConfirmDialog.close()
+        if (page.deleteClosesEditor) {
+            profileEditor.close()
+        }
+        page.deleteClosesEditor = false
+        page.deleteProfileName = ""
     }
 
     Rectangle {
@@ -35,8 +333,8 @@ Item {
 
             Rectangle {
                 Layout.fillHeight: true
-                Layout.preferredWidth: 284
-                color: "#14191a"
+                Layout.preferredWidth: page.sideWidth
+                color: Theme.sidebar
                 border.width: 0
 
                 ColumnLayout {
@@ -48,6 +346,7 @@ Item {
                         Layout.preferredHeight: 56
                         Layout.leftMargin: 14
                         Layout.rightMargin: 14
+                        spacing: 10
 
                         Text {
                             text: "Profiles"
@@ -55,6 +354,7 @@ Item {
                             font.pixelSize: 16
                             font.weight: Font.Bold
                             Layout.fillWidth: true
+                            verticalAlignment: Text.AlignVCenter
                         }
 
                         ActionButton {
@@ -64,8 +364,18 @@ Item {
                             variant: "primary"
                             implicitWidth: 28
                             implicitHeight: 28
-                            onClicked: profileManager.createProfile()
+                            onClicked: page.createAndEditProfile()
                         }
+                    }
+
+                    FormTextField {
+                        id: searchField
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 14
+                        Layout.rightMargin: 14
+                        Layout.bottomMargin: 14
+                        placeholderText: "Search profiles"
+                        onTextEdited: page.profileQuery = text
                     }
 
                     Rectangle {
@@ -75,18 +385,39 @@ Item {
                     }
 
                     ListView {
+                        id: profileList
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        model: profileManager.profiles
+                        model: page.filteredProfiles()
                         clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        currentIndex: profileManager.selectedProfileIndex
+                        highlightMoveDuration: 120
+                        ScrollBar.horizontal: StyledScrollBar {
+                            policy: ScrollBar.AlwaysOff
+                        }
+                        ScrollBar.vertical: StyledScrollBar {
+                            policy: ScrollBar.AsNeeded
+                        }
 
                         delegate: SidebarItem {
+                            width: ListView.view.width
                             title: modelData.name
                             subtitle: modelData.agentType
                             selected: modelData.index === profileManager.selectedProfileIndex
                             activeProfile: modelData.active
                             onClicked: profileManager.selectProfile(modelData.index)
                         }
+                    }
+
+                    Text {
+                        visible: profileList.count === 0
+                        text: "No profiles found"
+                        color: Theme.dim
+                        font.pixelSize: 12
+                        horizontalAlignment: Text.AlignHCenter
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: visible ? 32 : 0
                     }
                 }
             }
@@ -104,13 +435,14 @@ Item {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 104
-                    Layout.leftMargin: 20
-                    Layout.rightMargin: 20
+                    Layout.preferredHeight: 108
+                    Layout.leftMargin: page.contentMargin
+                    Layout.rightMargin: page.contentMargin
                     spacing: 16
 
                     Column {
                         Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignVCenter
                         spacing: 8
 
                         Text {
@@ -119,6 +451,8 @@ Item {
                             font.pixelSize: 24
                             font.weight: Font.Bold
                             width: parent.width
+                            height: 30
+                            verticalAlignment: Text.AlignVCenter
                             elide: Text.ElideRight
                         }
 
@@ -127,6 +461,8 @@ Item {
                             color: Theme.muted
                             font.pixelSize: 13
                             width: parent.width
+                            height: 18
+                            verticalAlignment: Text.AlignVCenter
                             elide: Text.ElideRight
                         }
                     }
@@ -135,21 +471,30 @@ Item {
                         text: "Activate"
                         iconName: "power"
                         variant: profileManager.currentProfile.active ? "secondary" : "primary"
-                        enabled: !profileManager.currentProfile.active
-                        onClicked: profileManager.activateSelectedProfile()
+                        enabled: profileManager.profiles.length > 0 && !profileManager.currentProfile.active
+                        Layout.alignment: Qt.AlignVCenter
+                        onClicked: {
+                            if (profileManager.activateSelectedProfile()) {
+                                settingsManager.activeProfileFolder = profileManager.currentProfile.folderName || ""
+                            }
+                        }
                     }
 
                     ActionButton {
                         text: "Edit"
                         iconName: "pencil"
-                        onClicked: profileManager.editSelectedProfile()
+                        enabled: profileManager.profiles.length > 0
+                        Layout.alignment: Qt.AlignVCenter
+                        onClicked: page.openEditor(false)
                     }
 
                     ActionButton {
                         text: "Delete"
                         iconName: "trash-2"
                         variant: "danger"
-                        onClicked: profileManager.deleteSelectedProfile()
+                        enabled: profileManager.profiles.length > 1
+                        Layout.alignment: Qt.AlignVCenter
+                        onClicked: page.requestDeleteSelectedProfile(false)
                     }
                 }
 
@@ -159,110 +504,986 @@ Item {
                     color: Theme.border
                 }
 
-                GridLayout {
+                ScrollView {
+                    id: profileDetailScroll
                     Layout.fillWidth: true
-                    Layout.leftMargin: 20
-                    Layout.rightMargin: 20
-                    Layout.topMargin: 22
-                    columns: width < 760 ? 1 : 2
-                    columnSpacing: 20
-                    rowSpacing: 18
-
-                    CodeCard {
-                        iconName: "file-cog"
-                        title: "config.toml"
-                        lines: page.configLines(profileManager.currentProfile)
+                    Layout.fillHeight: true
+                    clip: true
+                    contentWidth: availableWidth
+                    ScrollBar.horizontal: StyledScrollBar {
+                        policy: ScrollBar.AlwaysOff
+                    }
+                    ScrollBar.vertical: StyledScrollBar {
+                        policy: ScrollBar.AsNeeded
                     }
 
-                    CodeCard {
-                        iconName: "shield-check"
-                        title: "auth.json"
-                        lines: page.authLines(profileManager.currentProfile)
+                    ColumnLayout {
+                        width: profileDetailScroll.availableWidth
+                        spacing: 18
+
+                        GridLayout {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: page.contentMargin
+                            Layout.rightMargin: page.contentMargin
+                            Layout.topMargin: 20
+                            columns: width < 760 ? 1 : 3
+                            columnSpacing: 16
+                            rowSpacing: 16
+
+                            DetailTile {
+                                iconName: "bot"
+                                title: "Runtime"
+                                value: profileManager.currentProfile.agentType
+                                detail: profileManager.currentProfile.active ? "Currently active" : "Ready to activate"
+                                accent: profileManager.currentProfile.active ? Theme.success : Theme.accent
+                                accentFill: profileManager.currentProfile.active ? Theme.successSoft : Theme.accentSoft
+                            }
+
+                            DetailTile {
+                                iconName: "sliders-horizontal"
+                                title: "Model"
+                                value: profileManager.currentProfile.model
+                                detail: profileManager.currentProfile.modelProvider
+                                accent: Theme.accentHover
+                                accentFill: Theme.accentSoft
+                            }
+
+                            DetailTile {
+                                iconName: "activity"
+                                title: "Effort"
+                                value: profileManager.currentProfile.reasoningEffort
+                                detail: "Reasoning intensity"
+                                accent: Theme.warning
+                                accentFill: Theme.warningSoft
+                            }
+                        }
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: page.contentMargin
+                            Layout.rightMargin: page.contentMargin
+                            Layout.preferredHeight: connectionLayout.implicitHeight + 36
+                            radius: Theme.cardRadius
+                            color: Theme.panelRaised
+                            border.width: 1
+                            border.color: Theme.border
+
+                            ColumnLayout {
+                                id: connectionLayout
+                                anchors.fill: parent
+                                anchors.margins: 18
+                                spacing: 14
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 28
+                                    spacing: 10
+
+                                    Icon {
+                                        name: "shield-check"
+                                        size: 16
+                                        color: Theme.icon
+                                    }
+
+                                    Text {
+                                        text: "Connection & Security"
+                                        color: Theme.text
+                                        font.pixelSize: 15
+                                        font.weight: Font.Bold
+                                        Layout.fillWidth: true
+                                        verticalAlignment: Text.AlignVCenter
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Pill {
+                                        text: profileManager.currentProfile.maskedApiKey.length > 0 ? "Key saved" : "No key"
+                                        iconName: profileManager.currentProfile.maskedApiKey.length > 0 ? "check" : "triangle-alert"
+                                        fill: profileManager.currentProfile.maskedApiKey.length > 0 ? Theme.successSoft : Theme.warningSoft
+                                        foreground: profileManager.currentProfile.maskedApiKey.length > 0 ? Theme.success : Theme.warning
+                                    }
+                                }
+
+                                DetailValueRow {
+                                    iconName: "network"
+                                    label: "Base URL"
+                                    value: profileManager.currentProfile.baseUrl
+                                    detail: "Host: " + page.displayHost(profileManager.currentProfile.baseUrl)
+                                    accent: Theme.accent
+                                }
+
+                                DetailValueRow {
+                                    iconName: "key-round"
+                                    label: "API Key"
+                                    value: profileManager.currentProfile.maskedApiKey.length > 0 ? profileManager.currentProfile.maskedApiKey : "Not configured"
+                                    detail: "Secret"
+                                    accent: profileManager.currentProfile.maskedApiKey.length > 0 ? Theme.success : Theme.warning
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: page.contentMargin
+                            Layout.rightMargin: page.contentMargin
+                            Layout.preferredHeight: proxyLayout.implicitHeight + 36
+                            radius: Theme.cardRadius
+                            color: Theme.panelRaised
+                            border.width: 1
+                            border.color: Theme.border
+
+                            ColumnLayout {
+                                id: proxyLayout
+                                anchors.fill: parent
+                                anchors.margins: 18
+                                spacing: 14
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 28
+                                    spacing: 10
+
+                                    Icon {
+                                        name: "network"
+                                        size: 16
+                                        color: Theme.icon
+                                    }
+
+                                    Text {
+                                        text: "Proxy Routing"
+                                        color: Theme.text
+                                        font.pixelSize: 15
+                                        font.weight: Font.Bold
+                                        Layout.fillWidth: true
+                                        verticalAlignment: Text.AlignVCenter
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Pill {
+                                        text: profileManager.currentProfile.httpProxy.length > 0 || profileManager.currentProfile.httpsProxy.length > 0 ? "Proxy on" : "Direct"
+                                        iconName: profileManager.currentProfile.httpProxy.length > 0 || profileManager.currentProfile.httpsProxy.length > 0 ? "check" : "network"
+                                        fill: profileManager.currentProfile.httpProxy.length > 0 || profileManager.currentProfile.httpsProxy.length > 0 ? Theme.accentSoft : Theme.panelSoft
+                                        foreground: profileManager.currentProfile.httpProxy.length > 0 || profileManager.currentProfile.httpsProxy.length > 0 ? Theme.accentHover : Theme.muted
+                                    }
+                                }
+
+                                GridLayout {
+                                    Layout.fillWidth: true
+                                    columns: width < 820 ? 1 : 2
+                                    columnSpacing: 14
+                                    rowSpacing: 14
+
+                                    DetailValueRow {
+                                        iconName: "network"
+                                        label: "HTTP Proxy"
+                                        value: page.proxyLabel(profileManager.currentProfile.httpProxy)
+                                        detail: page.proxyDetail(profileManager.currentProfile.httpProxy)
+                                        accent: profileManager.currentProfile.httpProxy.length > 0 ? Theme.accent : Theme.muted
+                                    }
+
+                                    DetailValueRow {
+                                        iconName: "network"
+                                        label: "HTTPS Proxy"
+                                        value: page.proxyLabel(profileManager.currentProfile.httpsProxy)
+                                        detail: page.proxyDetail(profileManager.currentProfile.httpsProxy)
+                                        accent: profileManager.currentProfile.httpsProxy.length > 0 ? Theme.accent : Theme.muted
+                                    }
+                                }
+                            }
+                        }
+
+                        GridLayout {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: page.contentMargin
+                            Layout.rightMargin: page.contentMargin
+                            columns: width < 760 ? 1 : 3
+                            columnSpacing: 20
+                            rowSpacing: 18
+
+                            CodeCard {
+                                iconName: "file-cog"
+                                title: "config.toml"
+                                lines: page.configLines(profileManager.currentProfile)
+                                matchedLineCount: page.previewLineCount
+                            }
+
+                            CodeCard {
+                                iconName: "network"
+                                title: ".env"
+                                lines: page.envLines(profileManager.currentProfile)
+                                matchedLineCount: page.previewLineCount
+                            }
+
+                            CodeCard {
+                                iconName: "shield-check"
+                                title: "auth.json"
+                                lines: page.authLines(profileManager.currentProfile)
+                                matchedLineCount: page.previewLineCount
+                            }
+                        }
+
+                        Item {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 4
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Popup {
+        id: profileEditor
+
+        modal: true
+        focus: true
+        padding: 0
+        width: Math.max(520, Math.min(820, page.width - 72))
+        height: Math.max(460, Math.min(660, page.height - 72))
+        x: Math.round((page.width - width) / 2)
+        y: Math.round((page.height - height) / 2)
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        enter: Transition {
+            NumberAnimation {
+                property: "opacity"
+                from: 0
+                to: 1
+                duration: 140
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        exit: Transition {
+            NumberAnimation {
+                property: "opacity"
+                from: 1
+                to: 0
+                duration: 100
+                easing.type: Easing.InCubic
+            }
+        }
+
+        Overlay.modal: Rectangle {
+            color: Theme.overlay
+        }
+
+        background: Rectangle {
+            radius: Theme.cardRadius
+            color: Theme.panelRaised
+            border.width: 1
+            border.color: Theme.borderStrong
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 0
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 70
+                Layout.leftMargin: page.editorHorizontalPadding
+                Layout.rightMargin: 20
+                spacing: 12
+
+                Column {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignVCenter
+                    spacing: 4
+
+                    Text {
+                        text: page.editorCreating ? "Create Profile" : "Edit Profile"
+                        color: Theme.text
+                        font.pixelSize: 20
+                        font.weight: Font.Bold
+                        width: parent.width
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        text: profileManager.currentProfile.name
+                        visible: !page.editorCreating
+                        color: Theme.muted
+                        font.pixelSize: 12
+                        width: parent.width
+                        elide: Text.ElideRight
                     }
                 }
 
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 116
-                    Layout.leftMargin: 20
-                    Layout.rightMargin: 20
-                    Layout.topMargin: 8
-                    radius: Theme.cardRadius
-                    color: Theme.panelRaised
-                    border.width: 1
-                    border.color: Theme.border
+                ActionButton {
+                    text: ""
+                    iconName: "x"
+                    tooltip: "Close"
+                    implicitWidth: 30
+                    implicitHeight: 30
+                    onClicked: profileEditor.close()
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 1
+                color: Theme.border
+            }
+
+            ScrollView {
+                id: editorScroll
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                contentWidth: availableWidth
+                ScrollBar.horizontal: StyledScrollBar {
+                    policy: ScrollBar.AlwaysOff
+                }
+                ScrollBar.vertical: StyledScrollBar {
+                    policy: ScrollBar.AsNeeded
+                }
+
+                ColumnLayout {
+                    width: editorScroll.availableWidth
+                    spacing: 22
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: page.editorHorizontalPadding
+                        Layout.rightMargin: page.editorHorizontalPadding
+                        Layout.topMargin: 22
+                        spacing: 6
+
+                        Text {
+                            text: "Identity"
+                            color: Theme.text
+                            font.pixelSize: 14
+                            font.weight: Font.Bold
+                            Layout.fillWidth: true
+                        }
+
+                        Text {
+                            text: "Name the profile and choose its model provider."
+                            color: Theme.muted
+                            font.pixelSize: 12
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                        }
+                    }
 
                     GridLayout {
-                        anchors.fill: parent
-                        anchors.margins: 18
-                        columns: width < 720 ? 1 : 3
-                        columnSpacing: 18
-                        rowSpacing: 14
+                        Layout.fillWidth: true
+                        Layout.leftMargin: page.editorHorizontalPadding
+                        Layout.rightMargin: page.editorHorizontalPadding
+                        columns: width < 560 ? 1 : 2
+                        columnSpacing: 16
+                        rowSpacing: 18
 
-                        Column {
-                            spacing: 7
+                        ColumnLayout {
                             Layout.fillWidth: true
+                            Layout.preferredHeight: page.editorWarning.length > 0 ? 88 : page.editorFieldHeight
+                            spacing: 8
+
+                            Text {
+                                text: "Profile Name"
+                                color: Theme.text
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                            }
+
+                            FormTextField {
+                                id: editorNameField
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                onTextEdited: page.editorWarning = ""
+                            }
+
+                            Text {
+                                text: page.editorWarning
+                                visible: page.editorWarning.length > 0
+                                color: Theme.warning
+                                font.pixelSize: 11
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: page.editorFieldHeight
+                            spacing: 8
+
+                            Text {
+                                text: "Model Provider"
+                                color: Theme.text
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                            }
+
+                            FormComboBox {
+                                id: editorProviderBox
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                model: page.providers
+                                onActivated: page.refreshEditorModelOptions("")
+                            }
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: page.editorHorizontalPadding
+                        Layout.rightMargin: page.editorHorizontalPadding
+                        spacing: 6
+
+                        Text {
+                            text: "Codex Runtime"
+                            color: Theme.text
+                            font.pixelSize: 14
+                            font.weight: Font.Bold
+                            Layout.fillWidth: true
+                        }
+
+                        Text {
+                            text: "Provider table options written into config.toml."
+                            color: Theme.muted
+                            font.pixelSize: 12
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    GridLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: page.editorHorizontalPadding
+                        Layout.rightMargin: page.editorHorizontalPadding
+                        columns: width < 560 ? 1 : 2
+                        columnSpacing: 16
+                        rowSpacing: 18
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: page.editorFieldHeight
+                            spacing: 8
+
+                            Text {
+                                text: "Wire API"
+                                color: Theme.text
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                            }
+
+                            FormComboBox {
+                                id: editorWireApiBox
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                model: page.wireApis
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: page.editorFieldHeight
+                            spacing: 12
+
+                            Column {
+                                Layout.fillWidth: true
+                                spacing: 6
+
+                                Text {
+                                    text: "Disable Response Storage"
+                                    color: Theme.text
+                                    font.pixelSize: 12
+                                    font.weight: Font.DemiBold
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    text: editorStorageSwitch.checked ? "true" : "false"
+                                    color: Theme.muted
+                                    font.pixelSize: 12
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            ToggleSwitch {
+                                id: editorStorageSwitch
+                                checked: true
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: page.editorFieldHeight
+                            spacing: 12
+
+                            Column {
+                                Layout.fillWidth: true
+                                spacing: 6
+
+                                Text {
+                                    text: "Requires OpenAI Auth"
+                                    color: Theme.text
+                                    font.pixelSize: 12
+                                    font.weight: Font.DemiBold
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    text: editorOpenAiAuthSwitch.checked ? "true" : "false"
+                                    color: Theme.muted
+                                    font.pixelSize: 12
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            ToggleSwitch {
+                                id: editorOpenAiAuthSwitch
+                                checked: true
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: page.editorHorizontalPadding
+                        Layout.rightMargin: page.editorHorizontalPadding
+                        spacing: 6
+
+                        Text {
+                            text: "Connection"
+                            color: Theme.text
+                            font.pixelSize: 14
+                            font.weight: Font.Bold
+                            Layout.fillWidth: true
+                        }
+
+                        Text {
+                            text: "Endpoint and key used to load available models."
+                            color: Theme.muted
+                            font.pixelSize: 12
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    GridLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: page.editorHorizontalPadding
+                        Layout.rightMargin: page.editorHorizontalPadding
+                        columns: width < 560 ? 1 : 2
+                        columnSpacing: 16
+                        rowSpacing: 18
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: page.editorFieldHeight
+                            spacing: 8
 
                             Text {
                                 text: "Base URL"
-                                color: Theme.muted
+                                color: Theme.text
                                 font.pixelSize: 12
                                 font.weight: Font.DemiBold
                             }
 
-                            Text {
-                                text: profileManager.currentProfile.baseUrl
-                                color: Theme.text
-                                font.pixelSize: 13
-                                width: parent.width
-                                elide: Text.ElideRight
+                            FormTextField {
+                                id: editorBaseUrlField
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                placeholderText: "https://api.openai.com/v1"
+                                onTextEdited: page.markEndpointChanged()
                             }
                         }
 
-                        Column {
-                            spacing: 7
+                        ColumnLayout {
                             Layout.fillWidth: true
+                            Layout.preferredHeight: page.editorFieldHeight
+                            spacing: 8
 
                             Text {
-                                text: "HTTP Proxy"
-                                color: Theme.muted
+                                text: "API Key"
+                                color: Theme.text
                                 font.pixelSize: 12
                                 font.weight: Font.DemiBold
                             }
 
-                            Text {
-                                text: profileManager.currentProfile.httpProxy.length > 0 ? profileManager.currentProfile.httpProxy : "Disabled"
-                                color: Theme.text
-                                font.pixelSize: 13
-                                width: parent.width
-                                elide: Text.ElideRight
-                            }
-                        }
-
-                        Column {
-                            spacing: 7
-                            Layout.fillWidth: true
-
-                            Text {
-                                text: "HTTPS Proxy"
-                                color: Theme.muted
-                                font.pixelSize: 12
-                                font.weight: Font.DemiBold
-                            }
-
-                            Text {
-                                text: profileManager.currentProfile.httpsProxy.length > 0 ? profileManager.currentProfile.httpsProxy : "Disabled"
-                                color: Theme.text
-                                font.pixelSize: 13
-                                width: parent.width
-                                elide: Text.ElideRight
+                            FormTextField {
+                                id: editorApiKeyField
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                secret: true
+                                placeholderText: "sk-..."
                             }
                         }
                     }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: page.editorHorizontalPadding
+                        Layout.rightMargin: page.editorHorizontalPadding
+                        spacing: 14
+
+                        Column {
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Text {
+                                text: "Model & Effort"
+                                color: Theme.text
+                                font.pixelSize: 14
+                                font.weight: Font.Bold
+                                width: parent.width
+                            }
+
+                            Text {
+                                text: page.editorModelMessage
+                                color: Theme.muted
+                                font.pixelSize: 12
+                                width: parent.width
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        ActionButton {
+                            text: "Load from Endpoint"
+                            iconName: "refresh-cw"
+                            enabled: page.cleanEndpoint(editorBaseUrlField.text).length > 0
+                            Layout.alignment: Qt.AlignVCenter
+                            onClicked: page.refreshEditorModelOptions("")
+                        }
+                    }
+
+                    GridLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: page.editorHorizontalPadding
+                        Layout.rightMargin: page.editorHorizontalPadding
+                        columns: width < 560 ? 1 : 2
+                        columnSpacing: 16
+                        rowSpacing: 18
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: page.editorFieldHeight
+                            spacing: 8
+
+                            Text {
+                                text: "Model"
+                                color: Theme.text
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                            }
+
+                            FormComboBox {
+                                id: editorModelBox
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                enabled: page.editorModelOptionsReady
+                                model: page.editorModelOptions
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: page.editorFieldHeight
+                            spacing: 8
+
+                            Text {
+                                text: "Reasoning Effort"
+                                color: Theme.text
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                            }
+
+                            FormComboBox {
+                                id: editorEffortBox
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                enabled: page.editorModelOptionsReady
+                                model: page.efforts
+                            }
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: page.editorHorizontalPadding
+                        Layout.rightMargin: page.editorHorizontalPadding
+                        spacing: 6
+
+                        Text {
+                            text: "Proxy"
+                            color: Theme.text
+                            font.pixelSize: 14
+                            font.weight: Font.Bold
+                            Layout.fillWidth: true
+                        }
+
+                        Text {
+                            text: "Optional local routing applied after the provider and model are selected."
+                            color: Theme.muted
+                            font.pixelSize: 12
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    GridLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: page.editorHorizontalPadding
+                        Layout.rightMargin: page.editorHorizontalPadding
+                        columns: width < 560 ? 1 : 2
+                        columnSpacing: 16
+                        rowSpacing: 18
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: page.editorFieldHeight
+                            spacing: 8
+
+                            Text {
+                                text: "HTTP Proxy"
+                                color: Theme.text
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                            }
+
+                            FormTextField {
+                                id: editorHttpProxyField
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                placeholderText: "http://127.0.0.1:2080"
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: page.editorFieldHeight
+                            spacing: 8
+
+                            Text {
+                                text: "HTTPS Proxy"
+                                color: Theme.text
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                            }
+
+                            FormTextField {
+                                id: editorHttpsProxyField
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                placeholderText: "http://127.0.0.1:2080"
+                            }
+                        }
+                    }
+
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 4
+                    }
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 1
+                color: Theme.border
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 62
+                Layout.leftMargin: page.editorHorizontalPadding
+                Layout.rightMargin: page.editorHorizontalPadding
+                spacing: 10
+
+                ActionButton {
+                    text: "Delete"
+                    iconName: "trash-2"
+                    variant: "danger"
+                    visible: !page.editorCreating
+                    enabled: !page.editorCreating && profileManager.profiles.length > 1
+                    onClicked: page.requestDeleteSelectedProfile(true)
                 }
 
                 Item {
-                    Layout.fillHeight: true
+                    Layout.fillWidth: true
+                }
+
+                ActionButton {
+                    text: "Cancel"
+                    iconName: "x"
+                    onClicked: profileEditor.close()
+                }
+
+                ActionButton {
+                    text: "Save Profile"
+                    iconName: "save"
+                    variant: "primary"
+                    onClicked: page.saveEditor()
+                }
+            }
+        }
+    }
+
+    Popup {
+        id: deleteConfirmDialog
+
+        modal: true
+        focus: true
+        padding: 0
+        width: Math.max(360, Math.min(480, page.width - 48))
+        height: 236
+        x: Math.round((page.width - width) / 2)
+        y: Math.round((page.height - height) / 2)
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        enter: Transition {
+            NumberAnimation {
+                property: "opacity"
+                from: 0
+                to: 1
+                duration: 140
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        exit: Transition {
+            NumberAnimation {
+                property: "opacity"
+                from: 1
+                to: 0
+                duration: 100
+                easing.type: Easing.InCubic
+            }
+        }
+
+        Overlay.modal: Rectangle {
+            color: Theme.overlay
+        }
+
+        background: Rectangle {
+            radius: Theme.cardRadius
+            color: Theme.panelRaised
+            border.width: 1
+            border.color: Theme.borderStrong
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 0
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 74
+                Layout.leftMargin: 22
+                Layout.rightMargin: 18
+                spacing: 14
+
+                Rectangle {
+                    Layout.preferredWidth: 38
+                    Layout.preferredHeight: 38
+                    Layout.alignment: Qt.AlignVCenter
+                    radius: Theme.cardRadius
+                    color: Theme.dangerSoft
+                    border.width: 1
+                    border.color: Theme.danger
+
+                    Icon {
+                        anchors.centerIn: parent
+                        name: "trash-2"
+                        size: 18
+                        color: Theme.icon
+                    }
+                }
+
+                Column {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignVCenter
+                    spacing: 4
+
+                    Text {
+                        text: "Delete Profile?"
+                        color: Theme.text
+                        font.pixelSize: 18
+                        font.weight: Font.Bold
+                        width: parent.width
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        text: page.deleteProfileName
+                        color: Theme.muted
+                        font.pixelSize: 12
+                        width: parent.width
+                        elide: Text.ElideRight
+                    }
+                }
+
+                ActionButton {
+                    text: ""
+                    iconName: "x"
+                    tooltip: "Cancel"
+                    implicitWidth: 30
+                    implicitHeight: 30
+                    Layout.alignment: Qt.AlignVCenter
+                    onClicked: deleteConfirmDialog.close()
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 1
+                color: Theme.border
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.leftMargin: 22
+                Layout.rightMargin: 22
+                Layout.topMargin: 18
+                spacing: 8
+
+                Text {
+                    text: "This will remove the selected configuration from Loom."
+                    color: Theme.text
+                    font.pixelSize: 13
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                }
+
+                Text {
+                    text: "This action cannot be undone."
+                    color: Theme.danger
+                    font.pixelSize: 12
+                    font.weight: Font.DemiBold
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 62
+                Layout.leftMargin: 22
+                Layout.rightMargin: 22
+                spacing: 10
+
+                Item {
+                    Layout.fillWidth: true
+                }
+
+                ActionButton {
+                    text: "Cancel"
+                    iconName: "x"
+                    onClicked: deleteConfirmDialog.close()
+                }
+
+                ActionButton {
+                    text: "Delete"
+                    iconName: "trash-2"
+                    variant: "danger"
+                    onClicked: page.confirmDeleteSelectedProfile()
                 }
             }
         }
