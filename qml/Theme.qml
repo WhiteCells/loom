@@ -11,12 +11,15 @@ QtObject {
     readonly property color panelRaised: dark ? "#1a2022" : "#f6f8f7"
     readonly property color panelSoft: dark ? "#252c2e" : "#e9eeee"
     readonly property color panelHover: dark ? "#2b3335" : "#dde6e5"
-    readonly property color control: dark ? "#2c3639" : "#ffffff"
+    readonly property color control: dark ? "#2c3639" : "#fbfcfb"
     readonly property color controlHover: dark ? "#374245" : "#f2f6f5"
     readonly property color controlPressed: dark ? "#252e30" : "#e6eeec"
     readonly property color controlDisabled: dark ? "#1d2426" : "#edf2f1"
     readonly property color controlBorder: dark ? "#5a676b" : "#b8c5c2"
     readonly property color controlBorderStrong: dark ? "#7a878b" : "#8fa09c"
+    readonly property color tableHeader: dark ? "#202729" : "#eef4f2"
+    readonly property color tableRowHover: dark ? "#243033" : "#e8f0ee"
+    readonly property color tableDivider: dark ? "#293335" : "#dfe7e5"
     readonly property color selected: accentIndex === 1
                                       ? (dark ? "#0d3022" : "#d7efe2")
                                       : (accentIndex === 2 ? (dark ? "#342710" : "#f5e7c9") : (dark ? "#172846" : "#dce8f6"))
@@ -25,8 +28,8 @@ QtObject {
     readonly property color border: dark ? "#30393b" : "#cbd5d3"
     readonly property color borderStrong: dark ? "#4b575a" : "#aab8b6"
     readonly property color text: dark ? "#f2f6f7" : "#182121"
-    readonly property color icon: dark ? "#ffffff" : "#182121"
-    readonly property color iconSubtle: dark ? "#e6eeee" : "#647271"
+    readonly property color icon: dark ? "#f2f6f7" : "#182121"
+    readonly property color iconSubtle: dark ? "#c3cccb" : "#647271"
     readonly property color muted: dark ? "#a8b1b0" : "#647271"
     readonly property color dim: dark ? "#74807f" : "#8a9795"
     readonly property color accentBlue: dark ? "#0b63d9" : "#0b63d9"
@@ -49,7 +52,12 @@ QtObject {
     readonly property color dangerSoft: dark ? "#321b1c" : "#f6dddd"
     readonly property color dangerHover: dark ? "#5b2626" : "#efcccc"
     readonly property color dangerPressed: dark ? "#4d1f1f" : "#e8bcbc"
-    readonly property color dangerText: dark ? "#ffffff" : danger
-    readonly property color accentText: accentIndex === 2 && dark ? "#1f1705" : "white"
-    readonly property int cardRadius: 8
+    readonly property color dangerText: dark ? "#f8fbfb" : danger
+    readonly property color accentText: accentIndex === 2 && dark ? "#1f1705" : "#f8fbfb"
+    readonly property int pageRadius: 18
+    readonly property int cardRadius: 14
+    readonly property int controlRadius: 11
+    readonly property int itemRadius: 9
+    readonly property int smallRadius: 7
+    readonly property int hoverDuration: 110
 }

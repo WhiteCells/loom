@@ -1,5 +1,5 @@
 import QtQuick
-import QtQuick.Effects
+import QtQuick.Controls.impl
 import Loom
 
 Item {
@@ -16,21 +16,13 @@ Item {
     visible: name.length > 0
     baselineOffset: height
 
-    Image {
-        id: iconSource
+    IconImage {
         anchors.fill: parent
         source: root.name.length > 0 ? "qrc:/assets/icons/" + root.name + ".svg" : ""
         sourceSize.width: root.size * Screen.devicePixelRatio
         sourceSize.height: root.size * Screen.devicePixelRatio
         fillMode: Image.PreserveAspectFit
         smooth: true
-        visible: false
-    }
-
-    MultiEffect {
-        anchors.fill: iconSource
-        source: iconSource
-        colorization: 1.0
-        colorizationColor: root.color
+        color: root.color
     }
 }

@@ -16,7 +16,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: 8
+        radius: Theme.controlRadius
         color: Theme.controlDisabled
         border.width: 1
         border.color: Theme.controlBorder
@@ -26,7 +26,7 @@ Item {
         id: iconBox
         width: 34
         height: 34
-        radius: 8
+        radius: Theme.itemRadius
         color: Theme.control
         anchors.left: parent.left
         anchors.leftMargin: 16

@@ -17,26 +17,34 @@ Item {
     implicitHeight: 40
     implicitWidth: Math.max(116, control.labelNaturalWidth + 32)
     opacity: control.enabled ? 1 : 0.64
-    scale: control.down && control.enabled ? 0.985 : 1.0
+    scale: 1.0
 
     Rectangle {
         anchors.fill: parent
-        radius: 10
-        color: control.active ? Theme.accent : (control.hovered ? Theme.controlHover : "transparent")
+        radius: height / 2
+        color: control.active ? Theme.accent : Theme.controlHover
+        opacity: control.active ? 1 : (control.hovered ? 1 : 0)
         border.width: 1
-        border.color: control.active ? Theme.accentHover : (control.hovered ? Theme.controlBorder : "transparent")
+        border.color: control.active ? Theme.accentHover : Theme.controlBorder
 
         Behavior on color {
             enabled: !control.active
             ColorAnimation {
-                duration: 70
+                duration: Theme.hoverDuration
                 easing.type: Easing.OutCubic
             }
         }
 
         Behavior on border.color {
             ColorAnimation {
-                duration: 70
+                duration: Theme.hoverDuration
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: Theme.hoverDuration
                 easing.type: Easing.OutCubic
             }
         }
@@ -92,7 +100,7 @@ Item {
 
     Behavior on scale {
         NumberAnimation {
-            duration: 70
+            duration: Theme.hoverDuration
             easing.type: Easing.OutCubic
         }
     }

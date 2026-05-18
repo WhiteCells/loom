@@ -6,6 +6,9 @@ import Loom
 Item {
     id: page
 
+    readonly property int tableHorizontalPadding: 36
+    readonly property int usageContentWidth: 820
+
     function formatNumber(value) {
         return Number(value).toLocaleString(Qt.locale("en_US"), "f", 0)
     }
@@ -75,18 +78,24 @@ Item {
                 ScrollView {
                     id: tokenUsageScroll
                     anchors.fill: parent
-                    anchors.margins: 18
+                    anchors.leftMargin: page.tableHorizontalPadding
+                    anchors.rightMargin: page.tableHorizontalPadding
+                    anchors.topMargin: 20
+                    anchors.bottomMargin: 20
                     clip: true
                     contentWidth: availableWidth
                     ScrollBar.horizontal: StyledScrollBar {
                         policy: ScrollBar.AlwaysOff
+                        parent: tokenUsageScroll
                     }
                     ScrollBar.vertical: StyledScrollBar {
                         policy: ScrollBar.AsNeeded
+                        parent: tokenUsageScroll
                     }
 
                     ColumnLayout {
-                        width: tokenUsageScroll.availableWidth
+                        width: Math.min(tokenUsageScroll.availableWidth, page.usageContentWidth)
+                        anchors.horizontalCenter: parent.horizontalCenter
                         spacing: 18
 
                         Repeater {
@@ -102,11 +111,15 @@ Item {
 
                                 ColumnLayout {
                                     anchors.fill: parent
-                                    anchors.margins: 14
+                                    anchors.leftMargin: 18
+                                    anchors.rightMargin: 18
+                                    anchors.topMargin: 14
+                                    anchors.bottomMargin: 14
                                     spacing: 10
 
                                     RowLayout {
                                         Layout.fillWidth: true
+                                        spacing: 18
 
                                         Text {
                                             text: modelData.name
@@ -122,7 +135,7 @@ Item {
                                             color: Theme.muted
                                             font.pixelSize: 12
                                             font.weight: Font.DemiBold
-                                            Layout.preferredWidth: 180
+                                            Layout.preferredWidth: 210
                                             horizontalAlignment: Text.AlignRight
                                             elide: Text.ElideRight
                                         }

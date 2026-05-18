@@ -21,12 +21,65 @@
 #include "profilemanager.h"
 #include "settingsmanager.h"
 
+#ifdef Q_OS_WIN
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <dwmapi.h>
+#endif
+
 #ifndef LOOM_QML_MODULE_URI
 #define LOOM_QML_MODULE_URI "LoomQML"
 #endif
 
 namespace {
 constexpr int kInstanceWaitMs = 350;
+
+#ifdef Q_OS_WIN
+#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+#endif
+#ifndef DWMWA_BORDER_COLOR
+#define DWMWA_BORDER_COLOR 34
+#endif
+#ifndef DWMWA_CAPTION_COLOR
+#define DWMWA_CAPTION_COLOR 35
+#endif
+#ifndef DWMWA_TEXT_COLOR
+#define DWMWA_TEXT_COLOR 36
+#endif
+
+void applyWindowsTitleBarTheme(QWindow *window, bool dark)
+{
+    if (!window) {
+        return;
+    }
+
+    const HWND hwnd = reinterpret_cast<HWND>(window->winId());
+    if (!hwnd) {
+        return;
+    }
+
+    const BOOL useDarkMode = dark ? TRUE : FALSE;
+    DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &useDarkMode, sizeof(useDarkMode));
+
+    const COLORREF captionColor = dark ? RGB(0x1a, 0x20, 0x22) : RGB(0xf8, 0xfa, 0xf9);
+    const COLORREF textColor = dark ? RGB(0xf2, 0xf6, 0xf7) : RGB(0x18, 0x21, 0x21);
+    const COLORREF borderColor = dark ? RGB(0x30, 0x39, 0x3b) : RGB(0xcb, 0xd5, 0xd3);
+
+    DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, &captionColor, sizeof(captionColor));
+    DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, &textColor, sizeof(textColor));
+    DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, &borderColor, sizeof(borderColor));
+}
+#else
+void applyWindowsTitleBarTheme(QWindow *, bool)
+{
+}
+#endif
 
 QString singleInstanceRuntimePath(const QString &fileName)
 {
@@ -132,17 +185,16 @@ int main(int argc, char *argv[])
         if (settingsManager.restoreLastSection()) {
             settingsManager.setLastSection(profileManager.activeSection());
         }
-    });
-
-    QObject::connect(&profileManager, &ProfileManager::selectedProfileIndexChanged, &settingsManager, [&profileManager, &settingsManager] {
-        const QVariantMap profile = profileManager.currentProfile();
-        settingsManager.setSelectedProfileFolder(profile.value(QStringLiteral("folderName")).toString());
-    });
+    }, Qt::QueuedConnection);
 
     QObject::connect(&profileManager, &ProfileManager::currentProfileChanged, &settingsManager, [&profileManager, &settingsManager] {
         const QVariantMap profile = profileManager.currentProfile();
-        settingsManager.setSelectedProfileFolder(profile.value(QStringLiteral("folderName")).toString());
-    });
+        const QString folderName = profile.value(QStringLiteral("folderName")).toString();
+        settingsManager.setSelectedProfileFolder(folderName);
+        if (profile.value(QStringLiteral("active")).toBool()) {
+            settingsManager.setActiveProfileFolder(folderName);
+        }
+    }, Qt::QueuedConnection);
 
     QObject::connect(
         &engine,
@@ -158,6 +210,13 @@ int main(int argc, char *argv[])
     QWindow *mainWindow = engine.rootObjects().isEmpty()
                               ? nullptr
                               : qobject_cast<QWindow *>(engine.rootObjects().first());
+    applyWindowsTitleBarTheme(mainWindow, settingsManager.darkTheme());
+
+    if (mainWindow) {
+        QObject::connect(&settingsManager, &SettingsManager::darkThemeChanged, mainWindow, [mainWindow, &settingsManager] {
+            applyWindowsTitleBarTheme(mainWindow, settingsManager.darkTheme());
+        });
+    }
 
     const auto showMainWindow = [mainWindow] {
         if (!mainWindow) {
@@ -227,7 +286,9 @@ int main(int argc, char *argv[])
     QAction *restartAction = trayMenu.addAction(QStringLiteral("Restart"));
     QAction *quitAction = trayMenu.addAction(QStringLiteral("Quit Loom"));
 
-    const auto rebuildProfilesMenu = [&profileManager, &settingsManager, profilesMenu] {
+    bool profilesMenuDirty = true;
+    const auto rebuildProfilesMenu = [&profileManager, &settingsManager, profilesMenu, &profilesMenuDirty] {
+        profilesMenuDirty = false;
         profilesMenu->clear();
 
         const QVariantList profiles = profileManager.profiles();
@@ -259,13 +320,19 @@ int main(int argc, char *argv[])
             });
         }
     };
+    const auto markProfilesMenuDirty = [&profilesMenuDirty] {
+        profilesMenuDirty = true;
+    };
 
     rebuildProfilesMenu();
 
     QObject::connect(showAction, &QAction::triggered, &app, showMainWindow);
-    QObject::connect(profilesMenu, &QMenu::aboutToShow, &app, rebuildProfilesMenu);
-    QObject::connect(&profileManager, &ProfileManager::profilesChanged, &app, rebuildProfilesMenu);
-    QObject::connect(&profileManager, &ProfileManager::selectedProfileIndexChanged, &app, rebuildProfilesMenu);
+    QObject::connect(profilesMenu, &QMenu::aboutToShow, &app, [&rebuildProfilesMenu, &profilesMenuDirty] {
+        if (profilesMenuDirty) {
+            rebuildProfilesMenu();
+        }
+    });
+    QObject::connect(&profileManager, &ProfileManager::profilesChanged, &app, markProfilesMenuDirty);
 
     QObject::connect(restartAction, &QAction::triggered, &app, [&app, &instanceServer, instanceServerName] {
         QStringList arguments = QCoreApplication::arguments();

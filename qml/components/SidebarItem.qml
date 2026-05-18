@@ -18,30 +18,16 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: control.selected ? Theme.selected : (control.hovered ? Theme.controlHover : "transparent")
+        radius: Theme.controlRadius
+        color: control.selected ? Theme.selected : (control.hovered ? Theme.panelHover : "transparent")
         border.width: 1
-        border.color: control.selected ? Theme.accentHover : (control.hovered ? Theme.controlBorder : "transparent")
-
-        Behavior on color {
-            enabled: !control.selected
-            ColorAnimation {
-                duration: 70
-                easing.type: Easing.OutCubic
-            }
-        }
-
-        Behavior on border.color {
-            ColorAnimation {
-                duration: 70
-                easing.type: Easing.OutCubic
-            }
-        }
+        border.color: control.selected ? Theme.accentHover : "transparent"
     }
 
     Rectangle {
         width: 3
         height: parent.height - 18
-        radius: 2
+        radius: width / 2
         anchors.left: parent.left
         anchors.leftMargin: 1
         anchors.verticalCenter: parent.verticalCenter

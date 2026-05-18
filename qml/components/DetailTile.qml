@@ -41,7 +41,7 @@ Rectangle {
             Rectangle {
                 Layout.preferredWidth: 30
                 Layout.preferredHeight: 30
-                radius: 8
+                radius: Theme.itemRadius
                 color: tile.accentFill
 
                 Icon {

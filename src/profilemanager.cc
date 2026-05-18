@@ -1,5 +1,6 @@
 #include "profilemanager.h"
 
+#include <QByteArray>
 #include <QFile>
 #include <QFileInfo>
 #include <QHash>
@@ -133,6 +134,7 @@ ProfileManager::ProfileManager(QObject *parent)
         setStatusMessage(QStringLiteral("Create a profile to begin"));
     } else {
         m_profiles[0].active = true;
+        m_selectedProfileIndex = 0;
         setStatusMessage(QStringLiteral("Loaded %1 profiles").arg(m_profiles.size()));
     }
 }
@@ -325,8 +327,8 @@ bool ProfileManager::createProfileWithConfiguration(const QString &name,
     m_selectedProfileIndex = m_profiles.size() - 1;
 
     setStatusMessage(QStringLiteral("%1 created").arg(profile.name));
-    emit selectedProfileIndexChanged();
     emitDataChanged();
+    emit selectedProfileIndexChanged();
     return true;
 }
 
@@ -443,6 +445,11 @@ bool ProfileManager::saveConfiguration(const QString &name,
                        requiresOpenAiAuth);
     if (!writeProfileToDisk(profile, previousFolderName)) {
         profile->folderName = previousFolderName;
+        return false;
+    }
+
+    if (profile->active && !applySelectedProfileToCodex()) {
+        emitDataChanged();
         return false;
     }
 
@@ -802,43 +809,46 @@ bool ProfileManager::writeProfileToDisk(Profile *profile, const QString &previou
         return false;
     }
 
-    QSaveFile envFile(QDir(profilePath).filePath(QStringLiteral(".env")));
-    if (!envFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        setStatusMessage(fileError(QStringLiteral("write"), envFile.fileName()));
-        return false;
-    }
-    QTextStream envStream(&envFile);
+    const auto writeTextFile = [this](const QString &path, const QString &content) {
+        QSaveFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            setStatusMessage(fileError(QStringLiteral("write"), file.fileName()));
+            return false;
+        }
+
+        const QByteArray data = content.toUtf8();
+        if (file.write(data) != data.size() || !file.commit()) {
+            setStatusMessage(fileError(QStringLiteral("write"), file.fileName()));
+            return false;
+        }
+        return true;
+    };
+
+    QString envContent;
     if (!profile->apiKey.isEmpty()) {
-        envStream << "OPENAI_API_KEY=" << envValue(profile->apiKey) << "\n";
+        envContent += QStringLiteral("OPENAI_API_KEY=%1\n").arg(envValue(profile->apiKey));
     }
     if (!profile->httpProxy.isEmpty()) {
-        envStream << "HTTP_PROXY=" << envValue(profile->httpProxy) << "\n";
+        envContent += QStringLiteral("HTTP_PROXY=%1\n").arg(envValue(profile->httpProxy));
     }
     if (!profile->httpsProxy.isEmpty()) {
-        envStream << "HTTPS_PROXY=" << envValue(profile->httpsProxy) << "\n";
+        envContent += QStringLiteral("HTTPS_PROXY=%1\n").arg(envValue(profile->httpsProxy));
     }
-    if (!envFile.commit()) {
-        setStatusMessage(fileError(QStringLiteral("write"), envFile.fileName()));
+    if (!writeTextFile(QDir(profilePath).filePath(QStringLiteral(".env")), envContent)) {
         return false;
     }
 
-    QSaveFile configFile(QDir(profilePath).filePath(QStringLiteral("config.toml")));
-    if (!configFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        setStatusMessage(fileError(QStringLiteral("write"), configFile.fileName()));
-        return false;
-    }
-    QTextStream configStream(&configFile);
-    configStream << "model_provider = " << tomlString(profile->modelProvider) << "\n";
-    configStream << "model = " << tomlString(profile->model) << "\n";
-    configStream << "model_reasoning_effort = " << tomlString(profile->reasoningEffort) << "\n";
-    configStream << "disable_response_storage = " << (profile->disableResponseStorage ? "true" : "false") << "\n\n";
-    configStream << "[model_providers." << profile->modelProvider << "]\n";
-    configStream << "name = " << tomlString(profile->modelProvider) << "\n";
-    configStream << "base_url = " << tomlString(profile->baseUrl) << "\n";
-    configStream << "wire_api = " << tomlString(profile->wireApi) << "\n";
-    configStream << "requires_openai_auth = " << (profile->requiresOpenAiAuth ? "true" : "false") << "\n";
-    if (!configFile.commit()) {
-        setStatusMessage(fileError(QStringLiteral("write"), configFile.fileName()));
+    QString configContent;
+    configContent += QStringLiteral("model_provider = %1\n").arg(tomlString(profile->modelProvider));
+    configContent += QStringLiteral("model = %1\n").arg(tomlString(profile->model));
+    configContent += QStringLiteral("model_reasoning_effort = %1\n").arg(tomlString(profile->reasoningEffort));
+    configContent += QStringLiteral("disable_response_storage = %1\n\n").arg(profile->disableResponseStorage ? QStringLiteral("true") : QStringLiteral("false"));
+    configContent += QStringLiteral("[model_providers.%1]\n").arg(profile->modelProvider);
+    configContent += QStringLiteral("name = %1\n").arg(tomlString(profile->modelProvider));
+    configContent += QStringLiteral("base_url = %1\n").arg(tomlString(profile->baseUrl));
+    configContent += QStringLiteral("wire_api = %1\n").arg(tomlString(profile->wireApi));
+    configContent += QStringLiteral("requires_openai_auth = %1\n").arg(profile->requiresOpenAiAuth ? QStringLiteral("true") : QStringLiteral("false"));
+    if (!writeTextFile(QDir(profilePath).filePath(QStringLiteral("config.toml")), configContent)) {
         return false;
     }
 

@@ -24,7 +24,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: control.text.length === 0 ? height / 2 : Theme.cardRadius
+        radius: control.text.length === 0 ? height / 2 : Theme.controlRadius
         color: {
             if (!control.enabled) {
                 return Theme.controlDisabled

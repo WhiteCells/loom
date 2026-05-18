@@ -142,6 +142,6 @@ private:
     QVector<Profile> m_profiles;
     QVector<HealthCheck> m_healthChecks;
     QString m_activeSection;
-    int m_selectedProfileIndex = 0;
+    int m_selectedProfileIndex = -1;
     QString m_statusMessage;
 };

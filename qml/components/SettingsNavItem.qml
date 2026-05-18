@@ -18,25 +18,10 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: Theme.cardRadius
-        color: control.selected ? Theme.selected : (control.hovered ? Theme.controlHover : "transparent")
+        radius: Theme.controlRadius
+        color: control.selected ? Theme.selected : (control.hovered ? Theme.panelHover : "transparent")
         border.width: 1
-        border.color: control.selected ? Theme.accentHover : (control.hovered ? Theme.controlBorder : "transparent")
-
-        Behavior on color {
-            enabled: !control.selected
-            ColorAnimation {
-                duration: 70
-                easing.type: Easing.OutCubic
-            }
-        }
-
-        Behavior on border.color {
-            ColorAnimation {
-                duration: 70
-                easing.type: Easing.OutCubic
-            }
-        }
+        border.color: control.selected ? Theme.accentHover : "transparent"
     }
 
     Row {

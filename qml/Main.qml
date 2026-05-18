@@ -56,6 +56,7 @@ ApplicationWindow {
     Rectangle {
         anchors.fill: parent
         anchors.margins: root.outerMargin
+        radius: Theme.pageRadius
         color: Theme.window
         border.width: 1
         border.color: Theme.border
@@ -85,13 +86,13 @@ ApplicationWindow {
                     Row {
                         id: navContent
                         anchors.centerIn: parent
-                        spacing: 7
+                        spacing: 12
                         height: 38
 
                         Item {
                             id: brandSlot
                             height: 38
-                            width: brandContent.implicitWidth + 8
+                            width: brandContent.implicitWidth + 14
 
                             Row {
                                 id: brandContent
@@ -237,7 +238,7 @@ ApplicationWindow {
                     horizontalAlignment: Text.AlignRight
                     verticalAlignment: Text.AlignVCenter
                     Layout.preferredWidth: 360
-                    Layout.maximumWidth: parent.width * 0.45
+                    Layout.maximumWidth: Math.min(360, root.width * 0.45)
                     elide: Text.ElideRight
                 }
             }

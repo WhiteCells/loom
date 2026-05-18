@@ -53,7 +53,7 @@ Rectangle {
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            radius: 6
+            radius: Theme.controlRadius
             color: Theme.controlDisabled
             border.width: 1
             border.color: Theme.border

@@ -402,9 +402,11 @@ Item {
                         highlightMoveDuration: 120
                         ScrollBar.horizontal: StyledScrollBar {
                             policy: ScrollBar.AlwaysOff
+                            parent: profileList
                         }
                         ScrollBar.vertical: StyledScrollBar {
                             policy: ScrollBar.AsNeeded
+                            parent: profileList
                         }
 
                         delegate: SidebarItem {
@@ -519,9 +521,11 @@ Item {
                     contentWidth: availableWidth
                     ScrollBar.horizontal: StyledScrollBar {
                         policy: ScrollBar.AlwaysOff
+                        parent: profileDetailScroll
                     }
                     ScrollBar.vertical: StyledScrollBar {
                         policy: ScrollBar.AsNeeded
+                        parent: profileDetailScroll
                     }
 
                     ColumnLayout {
@@ -839,9 +843,11 @@ Item {
                 contentWidth: availableWidth
                 ScrollBar.horizontal: StyledScrollBar {
                     policy: ScrollBar.AlwaysOff
+                    parent: editorScroll
                 }
                 ScrollBar.vertical: StyledScrollBar {
                     policy: ScrollBar.AsNeeded
+                    parent: editorScroll
                 }
 
                 ColumnLayout {

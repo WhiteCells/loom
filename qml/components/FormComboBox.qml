@@ -13,7 +13,7 @@ ComboBox {
     font.pixelSize: 13
 
     background: Rectangle {
-        radius: 8
+        radius: Theme.controlRadius
         color: !control.enabled ? Theme.controlDisabled : (control.activeFocus || control.popup.visible ? Theme.controlHover : Theme.control)
         border.width: 1
         border.color: !control.enabled ? Theme.border : (control.activeFocus || control.popup.visible ? Theme.accent : (control.hovered ? Theme.controlBorderStrong : Theme.controlBorder))
@@ -56,11 +56,14 @@ ComboBox {
         y: control.height + 4
         width: control.width
         implicitHeight: contentItem.implicitHeight
-        padding: 0
+        leftPadding: 4
+        rightPadding: 4
+        topPadding: 4
+        bottomPadding: 4
 
         background: Rectangle {
-            radius: 8
-            color: Theme.control
+            radius: Theme.controlRadius
+            color: Theme.panelRaised
             border.width: 1
             border.color: Theme.controlBorderStrong
         }
@@ -72,19 +75,28 @@ ComboBox {
             currentIndex: control.highlightedIndex
             ScrollBar.horizontal: StyledScrollBar {
                 policy: ScrollBar.AlwaysOff
+                parent: control.popup.contentItem
             }
             ScrollBar.vertical: StyledScrollBar {
                 policy: ScrollBar.AsNeeded
+                parent: control.popup.contentItem
             }
         }
     }
 
     delegate: ItemDelegate {
-        width: control.width
-        height: 38
+        width: ListView.view ? ListView.view.width : control.width - 8
+        height: 36
         highlighted: control.highlightedIndex === index
+        leftPadding: 0
+        rightPadding: 0
+        topPadding: 0
+        bottomPadding: 0
 
         background: Rectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: Theme.itemRadius
             color: highlighted ? Theme.accentSoft : (hovered ? Theme.controlHover : "transparent")
         }
 

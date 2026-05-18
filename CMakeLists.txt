@@ -25,6 +25,7 @@ set_source_files_properties(qml/components/ActionButton.qml PROPERTIES QT_RESOUR
 set_source_files_properties(qml/components/CodeCard.qml PROPERTIES QT_RESOURCE_ALIAS components/CodeCard.qml)
 set_source_files_properties(qml/components/DetailTile.qml PROPERTIES QT_RESOURCE_ALIAS components/DetailTile.qml)
 set_source_files_properties(qml/components/DetailValueRow.qml PROPERTIES QT_RESOURCE_ALIAS components/DetailValueRow.qml)
+set_source_files_properties(qml/components/HealthChecksTable.qml PROPERTIES QT_RESOURCE_ALIAS components/HealthChecksTable.qml)
 set_source_files_properties(qml/components/FormComboBox.qml PROPERTIES QT_RESOURCE_ALIAS components/FormComboBox.qml)
 set_source_files_properties(qml/components/FormTextField.qml PROPERTIES QT_RESOURCE_ALIAS components/FormTextField.qml)
 set_source_files_properties(qml/components/Icon.qml PROPERTIES QT_RESOURCE_ALIAS components/Icon.qml)
@@ -60,6 +61,7 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/components/CodeCard.qml
         qml/components/DetailTile.qml
         qml/components/DetailValueRow.qml
+        qml/components/HealthChecksTable.qml
         qml/components/FormComboBox.qml
         qml/components/FormTextField.qml
         qml/components/Icon.qml
@@ -100,6 +102,10 @@ target_link_libraries(${PROJECT_NAME}
         Qt6::Svg
         Qt6::Widgets
 )
+
+if (WIN32)
+    target_link_libraries(${PROJECT_NAME} PRIVATE Dwmapi)
+endif()
 
 target_compile_definitions(${PROJECT_NAME}
     PRIVATE

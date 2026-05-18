@@ -10,7 +10,7 @@ Item {
     property string settingsMessage: ""
 
     readonly property int navWidth: 248
-    readonly property int maxContentWidth: 760
+    readonly property int maxContentWidth: 980
     readonly property var themes: ["Dark", "Light"]
     readonly property var densities: ["Comfortable", "Compact"]
     readonly property var backupWindows: ["7 days", "14 days", "30 days"]
@@ -152,9 +152,11 @@ Item {
                     contentWidth: availableWidth
                     ScrollBar.horizontal: StyledScrollBar {
                         policy: ScrollBar.AlwaysOff
+                        parent: settingsScroll
                     }
                     ScrollBar.vertical: StyledScrollBar {
                         policy: ScrollBar.AsNeeded
+                        parent: settingsScroll
                     }
 
                     StackLayout {
@@ -742,10 +744,6 @@ Item {
                 }
             }
 
-            Item {
-                Layout.preferredWidth: Math.max(0, parent.width - page.navWidth - page.maxContentWidth - 48)
-                Layout.fillHeight: true
-            }
         }
     }
 }

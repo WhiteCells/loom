@@ -1,12 +1,9 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 import Loom
 
 Item {
     id: page
-
-    readonly property int tableRowHeight: 50
 
     function formatNumber(value) {
         return Number(value).toLocaleString(Qt.locale("en_US"), "f", 0)
@@ -82,147 +79,11 @@ Item {
                 border.color: Theme.border
                 clip: true
 
-                ColumnLayout {
+                HealthChecksTable {
                     anchors.fill: parent
-                    spacing: 0
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 44
-                        spacing: 0
-
-                        Text {
-                            text: I18n.t("Profile")
-                            color: Theme.muted
-                            font.pixelSize: 12
-                            font.weight: Font.DemiBold
-                            Layout.preferredWidth: 170
-                            Layout.minimumWidth: 120
-                            Layout.leftMargin: 16
-                            verticalAlignment: Text.AlignVCenter
-                        }
-
-                        Text {
-                            text: I18n.t("Endpoint")
-                            color: Theme.muted
-                            font.pixelSize: 12
-                            font.weight: Font.DemiBold
-                            Layout.fillWidth: true
-                            Layout.preferredWidth: parent.width * 0.32
-                            verticalAlignment: Text.AlignVCenter
-                        }
-
-                        Text {
-                            text: I18n.t("Status")
-                            color: Theme.muted
-                            font.pixelSize: 12
-                            font.weight: Font.DemiBold
-                            Layout.preferredWidth: 118
-                            verticalAlignment: Text.AlignVCenter
-                        }
-
-                        Text {
-                            text: I18n.t("Latency")
-                            color: Theme.muted
-                            font.pixelSize: 12
-                            font.weight: Font.DemiBold
-                            Layout.preferredWidth: 94
-                            Layout.rightMargin: 16
-                            horizontalAlignment: Text.AlignRight
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                    }
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 1
-                        color: Theme.border
-                    }
-
-                    ScrollView {
-                        id: recentChecksScroll
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        clip: true
-                        contentWidth: availableWidth
-                        ScrollBar.horizontal: StyledScrollBar {
-                            policy: ScrollBar.AlwaysOff
-                        }
-                        ScrollBar.vertical: StyledScrollBar {
-                            policy: ScrollBar.AsNeeded
-                        }
-
-                        ColumnLayout {
-                            width: recentChecksScroll.availableWidth
-                            spacing: 0
-
-                            Repeater {
-                                model: profileManager.healthChecks
-
-                                delegate: Item {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: page.tableRowHeight
-                                    implicitHeight: page.tableRowHeight
-
-                                    RowLayout {
-                                        anchors.fill: parent
-                                        spacing: 0
-
-                                        Text {
-                                            text: modelData.profile
-                                            color: Theme.text
-                                            font.pixelSize: 12
-                                            font.weight: Font.DemiBold
-                                            Layout.preferredWidth: 170
-                                            Layout.minimumWidth: 120
-                                            Layout.leftMargin: 16
-                                            verticalAlignment: Text.AlignVCenter
-                                            elide: Text.ElideRight
-                                        }
-
-                                        Text {
-                                            text: modelData.endpoint
-                                            color: Theme.muted
-                                            font.pixelSize: 12
-                                            Layout.fillWidth: true
-                                            Layout.preferredWidth: parent.width * 0.32
-                                            verticalAlignment: Text.AlignVCenter
-                                            elide: Text.ElideRight
-                                        }
-
-                                        Item {
-                                            Layout.preferredWidth: 118
-                                            Pill {
-                                                text: modelData.status
-                                                iconName: modelData.status === "OK" ? "check" : "triangle-alert"
-                                                fill: modelData.status === "OK" ? Theme.successSoft : Theme.warningSoft
-                                                foreground: modelData.status === "OK" ? Theme.success : Theme.warning
-                                                anchors.verticalCenter: parent.verticalCenter
-                                            }
-                                        }
-
-                                        Text {
-                                            text: modelData.latency
-                                            color: Theme.muted
-                                            font.pixelSize: 12
-                                            Layout.preferredWidth: 94
-                                            Layout.rightMargin: 16
-                                            horizontalAlignment: Text.AlignRight
-                                            verticalAlignment: Text.AlignVCenter
-                                        }
-                                    }
-
-                                    Rectangle {
-                                        anchors.left: parent.left
-                                        anchors.right: parent.right
-                                        anchors.bottom: parent.bottom
-                                        height: 1
-                                        color: Theme.border
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    model: profileManager.healthChecks
+                    showCheckedAt: false
+                    onRunRequested: profileManager.runHealthCheck()
                 }
             }
         }
