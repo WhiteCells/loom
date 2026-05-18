@@ -5,6 +5,8 @@ import Loom
 ComboBox {
     id: control
 
+    property bool translateItems: false
+
     implicitHeight: 40
     leftPadding: 14
     rightPadding: 38
@@ -34,7 +36,7 @@ ComboBox {
     contentItem: Text {
         leftPadding: 14
         rightPadding: 38
-        text: control.displayText
+        text: control.translateItems ? I18n.t(control.displayText) : control.displayText
         color: control.enabled ? Theme.text : Theme.dim
         font: control.font
         verticalAlignment: Text.AlignVCenter
@@ -87,7 +89,7 @@ ComboBox {
         }
 
         contentItem: Text {
-            text: modelData
+            text: control.translateItems ? I18n.t(modelData) : modelData
             color: Theme.text
             font.pixelSize: 13
             leftPadding: 14

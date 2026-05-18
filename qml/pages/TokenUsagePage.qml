@@ -23,7 +23,7 @@ Item {
             spacing: 22
 
             Text {
-                text: "Token Usage"
+                text: I18n.t("Token Usage")
                 color: Theme.text
                 font.pixelSize: 26
                 font.weight: Font.Bold
@@ -39,25 +39,25 @@ Item {
                 rowSpacing: 14
 
                 StatCard {
-                    title: "Usage Today"
+                    title: I18n.t("Usage Today")
                     value: page.formatNumber(profileManager.dashboard.tokensToday)
-                    detail: profileManager.dashboard.tokenDetail
+                    detail: I18n.status(profileManager.dashboard.tokenDetail)
                     iconName: "chart-no-axes-column"
                     iconColor: Theme.danger
                 }
 
                 StatCard {
-                    title: "Tracked Profiles"
+                    title: I18n.t("Tracked Profiles")
                     value: String(profileManager.dashboard.profileCount)
-                    detail: profileManager.dashboard.activeProfile + " active"
+                    detail: I18n.arg(I18n.t("%1 active"), I18n.status(profileManager.dashboard.activeProfile))
                     iconName: "users-round"
                     iconColor: Theme.accentHover
                 }
 
                 StatCard {
-                    title: "Health"
-                    value: profileManager.dashboard.systemHealth
-                    detail: profileManager.dashboard.healthDetail
+                    title: I18n.t("Health")
+                    value: I18n.status(profileManager.dashboard.systemHealth)
+                    detail: I18n.status(profileManager.dashboard.healthDetail)
                     iconName: "activity"
                     iconColor: Theme.success
                 }

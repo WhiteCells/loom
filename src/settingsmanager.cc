@@ -37,6 +37,11 @@ QStringList sections()
             QStringLiteral("Settings")};
 }
 
+QStringList languages()
+{
+    return {QStringLiteral("en"), QStringLiteral("zh")};
+}
+
 QString validatedChoice(const QString &value, const QStringList &choices, const QString &fallback)
 {
     return choices.contains(value) ? value : fallback;
@@ -178,6 +183,24 @@ void SettingsManager::setHealthCheckOnActivate(bool healthCheckOnActivate)
 
     m_healthCheckOnActivate = healthCheckOnActivate;
     emit healthCheckOnActivateChanged();
+    emit valuesChanged();
+    persistAfterChange();
+}
+
+QString SettingsManager::language() const
+{
+    return m_language;
+}
+
+void SettingsManager::setLanguage(const QString &language)
+{
+    const QString nextLanguage = validatedChoice(language.trimmed(), languages(), QStringLiteral("en"));
+    if (m_language == nextLanguage) {
+        return;
+    }
+
+    m_language = nextLanguage;
+    emit languageChanged();
     emit valuesChanged();
     persistAfterChange();
 }
@@ -330,6 +353,7 @@ QVariantMap SettingsManager::values() const
     appearance.insert(QStringLiteral("theme"), m_darkTheme ? QStringLiteral("Dark") : QStringLiteral("Light"));
     appearance.insert(QStringLiteral("density"), m_density);
     appearance.insert(QStringLiteral("accentIndex"), m_accentIndex);
+    appearance.insert(QStringLiteral("language"), m_language);
 
     QVariantMap behavior;
     behavior.insert(QStringLiteral("launchAtLogin"), m_launchAtLogin);
@@ -449,6 +473,7 @@ void SettingsManager::emitAllChanged()
     emit launchAtLoginChanged();
     emit restoreLastSectionChanged();
     emit healthCheckOnActivateChanged();
+    emit languageChanged();
     emit maskSecretsChanged();
     emit keepBackupsChanged();
     emit backupRetentionChanged();
@@ -503,6 +528,7 @@ bool SettingsManager::loadFromDisk(bool announce)
     m_darkTheme = theme.compare(QStringLiteral("Light"), Qt::CaseInsensitive) != 0;
     m_density = validatedChoice(jsonString(appearance, QStringLiteral("density"), m_density), densities(), QStringLiteral("Comfortable"));
     m_accentIndex = boundedAccentIndex(jsonInt(appearance, QStringLiteral("accentIndex"), m_accentIndex));
+    m_language = validatedChoice(jsonString(appearance, QStringLiteral("language"), m_language).trimmed(), languages(), QStringLiteral("en"));
 
     m_launchAtLogin = jsonBool(behavior, QStringLiteral("launchAtLogin"), m_launchAtLogin);
     m_restoreLastSection = jsonBool(behavior, QStringLiteral("restoreLastSection"), m_restoreLastSection);
@@ -567,6 +593,7 @@ bool SettingsManager::writeSettingsToDisk(bool announce)
     appearance.insert(QStringLiteral("theme"), m_darkTheme ? QStringLiteral("Dark") : QStringLiteral("Light"));
     appearance.insert(QStringLiteral("density"), m_density);
     appearance.insert(QStringLiteral("accentIndex"), m_accentIndex);
+    appearance.insert(QStringLiteral("language"), m_language);
 
     QJsonObject behavior;
     behavior.insert(QStringLiteral("launchAtLogin"), m_launchAtLogin);

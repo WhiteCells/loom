@@ -14,14 +14,16 @@ Item {
     readonly property var themes: ["Dark", "Light"]
     readonly property var densities: ["Comfortable", "Compact"]
     readonly property var backupWindows: ["7 days", "14 days", "30 days"]
+    readonly property var languages: ["en", "zh"]
+    readonly property var languageNames: ["English", "Chinese"]
     readonly property var accentColors: [Theme.accentBlue, Theme.accentGreen, Theme.accentAmber]
     readonly property var accentNames: ["Blue", "Green", "Amber"]
 
     function displayMessage() {
         if (settingsMessage.length > 0) {
-            return settingsMessage
+            return I18n.status(settingsMessage)
         }
-        return settingsManager.statusMessage.length > 0 ? settingsManager.statusMessage : "Settings are local"
+        return settingsManager.statusMessage.length > 0 ? I18n.status(settingsManager.statusMessage) : I18n.t("Settings are local")
     }
 
     function indexFor(values, value) {
@@ -35,22 +37,22 @@ Item {
 
     function tabTitle() {
         if (settingsTab === 1) {
-            return "Behavior"
+            return I18n.t("Behavior")
         }
         if (settingsTab === 2) {
-            return "Storage & Privacy"
+            return I18n.t("Storage & Privacy")
         }
-        return "Appearance"
+        return I18n.t("Appearance")
     }
 
     function tabDetail() {
         if (settingsTab === 1) {
-            return "Startup, restore, and confirmation preferences."
+            return I18n.t("Startup, restore, and confirmation preferences.")
         }
         if (settingsTab === 2) {
-            return "Local data, backups, and secret visibility."
+            return I18n.t("Local data, backups, and secret visibility.")
         }
-        return "Theme, density, and accent preferences."
+        return I18n.t("Theme, density, and accent preferences.")
     }
 
     Rectangle {
@@ -72,7 +74,7 @@ Item {
                 spacing: 10
 
                 Text {
-                    text: "SOFTWARE"
+                    text: I18n.t("SOFTWARE")
                     color: Theme.muted
                     font.pixelSize: 10
                     font.weight: Font.Bold
@@ -82,7 +84,7 @@ Item {
                 }
 
                 SettingsNavItem {
-                    text: "Appearance"
+                    text: I18n.t("Appearance")
                     iconName: "sliders-horizontal"
                     selected: page.settingsTab === 0
                     Layout.fillWidth: true
@@ -90,7 +92,7 @@ Item {
                 }
 
                 SettingsNavItem {
-                    text: "Behavior"
+                    text: I18n.t("Behavior")
                     iconName: "activity"
                     selected: page.settingsTab === 1
                     Layout.fillWidth: true
@@ -98,7 +100,7 @@ Item {
                 }
 
                 SettingsNavItem {
-                    text: "Storage & Privacy"
+                    text: I18n.t("Storage & Privacy")
                     iconName: "shield-check"
                     selected: page.settingsTab === 2
                     Layout.fillWidth: true
@@ -181,14 +183,14 @@ Item {
                                         spacing: 6
 
                                         Text {
-                                            text: "Color Theme"
+                                            text: I18n.t("Color Theme")
                                             color: Theme.text
                                             font.pixelSize: 13
                                             font.weight: Font.DemiBold
                                         }
 
                                         Text {
-                                            text: themeBox.currentText
+                                            text: I18n.t(themeBox.currentText)
                                             color: Theme.muted
                                             font.pixelSize: 12
                                         }
@@ -197,6 +199,7 @@ Item {
                                     FormComboBox {
                                         id: themeBox
                                         Layout.preferredWidth: 180
+                                        translateItems: true
                                         model: page.themes
                                         currentIndex: settingsManager.darkTheme ? 0 : 1
                                         onActivated: function(index) {
@@ -225,14 +228,14 @@ Item {
                                         spacing: 6
 
                                         Text {
-                                            text: "Interface Density"
+                                            text: I18n.t("Interface Density")
                                             color: Theme.text
                                             font.pixelSize: 13
                                             font.weight: Font.DemiBold
                                         }
 
                                         Text {
-                                            text: densityBox.currentText
+                                            text: I18n.t(densityBox.currentText)
                                             color: Theme.muted
                                             font.pixelSize: 12
                                         }
@@ -241,11 +244,12 @@ Item {
                                     FormComboBox {
                                         id: densityBox
                                         Layout.preferredWidth: 180
+                                        translateItems: true
                                         model: page.densities
                                         currentIndex: page.indexFor(page.densities, settingsManager.density)
                                         onActivated: function(index) {
                                             settingsManager.density = page.densities[index]
-                                            page.settingsMessage = page.densities[index] + " density enabled"
+                                            page.settingsMessage = I18n.arg(I18n.t("%1 density enabled"), I18n.t(page.densities[index]))
                                         }
                                     }
                                 }
@@ -269,14 +273,14 @@ Item {
                                         spacing: 6
 
                                         Text {
-                                            text: "Accent Color"
+                                            text: I18n.t("Accent Color")
                                             color: Theme.text
                                             font.pixelSize: 13
                                             font.weight: Font.DemiBold
                                         }
 
                                         Text {
-                                            text: page.accentNames[Theme.accentIndex]
+                                            text: I18n.t(page.accentNames[Theme.accentIndex])
                                             color: Theme.muted
                                             font.pixelSize: 12
                                         }
@@ -303,10 +307,55 @@ Item {
                                                     cursorShape: Qt.PointingHandCursor
                                                     onClicked: {
                                                         settingsManager.accentIndex = index
-                                                        page.settingsMessage = page.accentNames[index] + " accent enabled"
+                                                        page.settingsMessage = I18n.arg(I18n.t("%1 accent enabled"), I18n.t(page.accentNames[index]))
                                                     }
                                                 }
                                             }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 74
+                                radius: Theme.cardRadius
+                                color: Theme.panelRaised
+                                border.width: 1
+                                border.color: Theme.border
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 18
+
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        Text {
+                                            text: I18n.t("Language")
+                                            color: Theme.text
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Text {
+                                            text: I18n.t(languageBox.currentText)
+                                            color: Theme.muted
+                                            font.pixelSize: 12
+                                        }
+                                    }
+
+                                    FormComboBox {
+                                        id: languageBox
+                                        Layout.preferredWidth: 180
+                                        translateItems: true
+                                        model: page.languageNames
+                                        currentIndex: page.indexFor(page.languages, settingsManager.language)
+                                        onActivated: function(index) {
+                                            settingsManager.language = page.languages[index]
+                                            page.settingsMessage = "Language changed"
                                         }
                                     }
                                 }
@@ -334,14 +383,14 @@ Item {
                                         spacing: 6
 
                                         Text {
-                                            text: "Launch at Login"
+                                            text: I18n.t("Launch at Login")
                                             color: Theme.text
                                             font.pixelSize: 13
                                             font.weight: Font.DemiBold
                                         }
 
                                         Text {
-                                            text: settingsManager.launchAtLogin ? "On" : "Off"
+                                            text: settingsManager.launchAtLogin ? I18n.t("On") : I18n.t("Off")
                                             color: Theme.muted
                                             font.pixelSize: 12
                                         }
@@ -375,14 +424,14 @@ Item {
                                         spacing: 6
 
                                         Text {
-                                            text: "Restore Last Section"
+                                            text: I18n.t("Restore Last Section")
                                             color: Theme.text
                                             font.pixelSize: 13
                                             font.weight: Font.DemiBold
                                         }
 
                                         Text {
-                                            text: settingsManager.restoreLastSection ? "On" : "Off"
+                                            text: settingsManager.restoreLastSection ? I18n.t("On") : I18n.t("Off")
                                             color: Theme.muted
                                             font.pixelSize: 12
                                         }
@@ -416,14 +465,14 @@ Item {
                                         spacing: 6
 
                                         Text {
-                                            text: "Confirm Profile Deletion"
+                                            text: I18n.t("Confirm Profile Deletion")
                                             color: Theme.text
                                             font.pixelSize: 13
                                             font.weight: Font.DemiBold
                                         }
 
                                         Text {
-                                            text: settingsManager.confirmProfileDeletion ? "Required" : "Off"
+                                            text: settingsManager.confirmProfileDeletion ? I18n.t("Required") : I18n.t("Off")
                                             color: Theme.muted
                                             font.pixelSize: 12
                                         }
@@ -454,14 +503,14 @@ Item {
                                         spacing: 6
 
                                         Text {
-                                            text: "Health Check on Activate"
+                                            text: I18n.t("Health Check on Activate")
                                             color: Theme.text
                                             font.pixelSize: 13
                                             font.weight: Font.DemiBold
                                         }
 
                                         Text {
-                                            text: settingsManager.healthCheckOnActivate ? "On" : "Off"
+                                            text: settingsManager.healthCheckOnActivate ? I18n.t("On") : I18n.t("Off")
                                             color: Theme.muted
                                             font.pixelSize: 12
                                         }
@@ -499,7 +548,7 @@ Item {
                                         spacing: 6
 
                                         Text {
-                                            text: "Data Location"
+                                            text: I18n.t("Data Location")
                                             color: Theme.text
                                             font.pixelSize: 13
                                             font.weight: Font.DemiBold
@@ -515,7 +564,7 @@ Item {
                                     }
 
                                     ActionButton {
-                                        text: "Reveal"
+                                        text: I18n.t("Reveal")
                                         iconName: "file-cog"
                                         onClicked: page.settingsMessage = settingsManager.settingsPath
                                     }
@@ -540,14 +589,14 @@ Item {
                                         spacing: 6
 
                                         Text {
-                                            text: "Mask Secrets"
+                                            text: I18n.t("Mask Secrets")
                                             color: Theme.text
                                             font.pixelSize: 13
                                             font.weight: Font.DemiBold
                                         }
 
                                         Text {
-                                            text: settingsManager.maskSecrets ? "On" : "Off"
+                                            text: settingsManager.maskSecrets ? I18n.t("On") : I18n.t("Off")
                                             color: Theme.muted
                                             font.pixelSize: 12
                                         }
@@ -581,14 +630,14 @@ Item {
                                         spacing: 6
 
                                         Text {
-                                            text: "Local Backups"
+                                            text: I18n.t("Local Backups")
                                             color: Theme.text
                                             font.pixelSize: 13
                                             font.weight: Font.DemiBold
                                         }
 
                                         Text {
-                                            text: settingsManager.keepBackups ? "On" : "Off"
+                                            text: settingsManager.keepBackups ? I18n.t("On") : I18n.t("Off")
                                             color: Theme.muted
                                             font.pixelSize: 12
                                         }
@@ -622,14 +671,14 @@ Item {
                                         spacing: 6
 
                                         Text {
-                                            text: "Backup Retention"
+                                            text: I18n.t("Backup Retention")
                                             color: Theme.text
                                             font.pixelSize: 13
                                             font.weight: Font.DemiBold
                                         }
 
                                         Text {
-                                            text: backupWindowBox.currentText
+                                            text: I18n.t(backupWindowBox.currentText)
                                             color: Theme.muted
                                             font.pixelSize: 12
                                         }
@@ -638,11 +687,12 @@ Item {
                                     FormComboBox {
                                         id: backupWindowBox
                                         Layout.preferredWidth: 180
+                                        translateItems: true
                                         model: page.backupWindows
                                         currentIndex: page.indexFor(page.backupWindows, settingsManager.backupRetention)
                                         onActivated: function(index) {
                                             settingsManager.backupRetention = page.backupWindows[index]
-                                            page.settingsMessage = page.backupWindows[index] + " backup retention enabled"
+                                            page.settingsMessage = I18n.arg(I18n.t("%1 backup retention enabled"), I18n.t(page.backupWindows[index]))
                                         }
                                     }
                                 }
@@ -671,13 +721,13 @@ Item {
                     }
 
                     ActionButton {
-                        text: "Clear Cache"
+                        text: I18n.t("Clear Cache")
                         iconName: "trash-2"
                         onClicked: page.settingsMessage = "Cache cleared"
                     }
 
                     ActionButton {
-                        text: "Save Settings"
+                        text: I18n.t("Save Settings")
                         iconName: "save"
                         variant: "primary"
                         onClicked: {

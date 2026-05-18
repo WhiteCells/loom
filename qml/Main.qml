@@ -30,6 +30,12 @@ ApplicationWindow {
     title: "Loom"
     color: Theme.window
 
+    Binding {
+        target: I18n
+        property: "language"
+        value: settingsManager.language
+    }
+
     Component.onCompleted: {
         Theme.dark = settingsManager.darkTheme
         Theme.accentIndex = settingsManager.accentIndex
@@ -102,7 +108,7 @@ ApplicationWindow {
 
                                 Text {
                                     id: brandText
-                                    text: "LOOM"
+                                    text: I18n.t("LOOM")
                                     color: Theme.text
                                     font.pixelSize: 14
                                     font.weight: Font.Bold
@@ -114,35 +120,35 @@ ApplicationWindow {
                         }
 
                         NavButton {
-                            text: "Dashboard"
+                            text: I18n.t("Dashboard")
                             iconName: "layout-dashboard"
                             active: profileManager.activeSection === "Dashboard"
                             onClicked: profileManager.selectSection("Dashboard")
                         }
 
                         NavButton {
-                            text: "Profiles"
+                            text: I18n.t("Profiles")
                             iconName: "users-round"
                             active: profileManager.activeSection === "Profiles"
                             onClicked: profileManager.selectSection("Profiles")
                         }
 
                         NavButton {
-                            text: "Health Checks"
+                            text: I18n.t("Health Checks")
                             iconName: "activity"
                             active: profileManager.activeSection === "Health Checks"
                             onClicked: profileManager.selectSection("Health Checks")
                         }
 
                         NavButton {
-                            text: "Token Usage"
+                            text: I18n.t("Token Usage")
                             iconName: "chart-no-axes-column"
                             active: profileManager.activeSection === "Token Usage"
                             onClicked: profileManager.selectSection("Token Usage")
                         }
 
                         NavButton {
-                            text: "Settings"
+                            text: I18n.t("Settings")
                             iconName: "settings"
                             active: profileManager.activeSection === "Settings"
                             onClicked: profileManager.selectSection("Settings")
@@ -216,7 +222,7 @@ ApplicationWindow {
                 spacing: 12
 
                 Text {
-                    text: "Current: " + profileManager.dashboard.activeProfile
+                    text: I18n.t("Current: ") + I18n.status(profileManager.dashboard.activeProfile)
                     color: Theme.muted
                     font.pixelSize: 12
                     Layout.fillWidth: true
@@ -225,7 +231,7 @@ ApplicationWindow {
                 }
 
                 Text {
-                    text: profileManager.statusMessage
+                    text: I18n.status(profileManager.statusMessage)
                     color: Theme.muted
                     font.pixelSize: 12
                     horizontalAlignment: Text.AlignRight

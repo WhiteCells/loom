@@ -25,7 +25,7 @@ Item {
             spacing: 26
 
             Text {
-                text: "Overview"
+                text: I18n.t("Overview")
                 color: Theme.text
                 font.pixelSize: 28
                 font.weight: Font.Bold
@@ -41,32 +41,32 @@ Item {
                 rowSpacing: 14
 
                 StatCard {
-                    title: "Active Profile"
-                    value: profileManager.dashboard.activeProfile
-                    detail: profileManager.dashboard.activeAgent
+                    title: I18n.t("Active Profile")
+                    value: I18n.status(profileManager.dashboard.activeProfile)
+                    detail: I18n.status(profileManager.dashboard.activeAgent)
                     iconName: "users-round"
                     iconColor: Theme.accentHover
                 }
 
                 StatCard {
-                    title: "System Health"
-                    value: profileManager.dashboard.systemHealth
-                    detail: profileManager.dashboard.lastChecked
+                    title: I18n.t("System Health")
+                    value: I18n.status(profileManager.dashboard.systemHealth)
+                    detail: I18n.status(profileManager.dashboard.lastChecked)
                     iconName: "activity"
                     iconColor: Theme.success
                 }
 
                 StatCard {
-                    title: "Token Usage (Today)"
+                    title: I18n.t("Token Usage (Today)")
                     value: page.formatNumber(profileManager.dashboard.tokensToday)
-                    detail: profileManager.dashboard.tokenDetail
+                    detail: I18n.status(profileManager.dashboard.tokenDetail)
                     iconName: "chart-no-axes-column"
                     iconColor: Theme.danger
                 }
             }
 
             Text {
-                text: "Recent Health Checks"
+                text: I18n.t("Recent Health Checks")
                 color: Theme.text
                 font.pixelSize: 20
                 font.weight: Font.Bold
@@ -92,7 +92,7 @@ Item {
                         spacing: 0
 
                         Text {
-                            text: "Profile"
+                            text: I18n.t("Profile")
                             color: Theme.muted
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
@@ -103,7 +103,7 @@ Item {
                         }
 
                         Text {
-                            text: "Endpoint"
+                            text: I18n.t("Endpoint")
                             color: Theme.muted
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
@@ -113,7 +113,7 @@ Item {
                         }
 
                         Text {
-                            text: "Status"
+                            text: I18n.t("Status")
                             color: Theme.muted
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
@@ -122,7 +122,7 @@ Item {
                         }
 
                         Text {
-                            text: "Latency"
+                            text: I18n.t("Latency")
                             color: Theme.muted
                             font.pixelSize: 12
                             font.weight: Font.DemiBold

@@ -45,7 +45,7 @@ TextField {
         visible: control.secret
         text: ""
         iconName: control.secretVisible ? "eye-off" : "eye"
-        tooltip: control.secretVisible ? "Hide" : "Show"
+        tooltip: control.secretVisible ? I18n.t("Hide") : I18n.t("Show")
         implicitWidth: 28
         implicitHeight: 28
         anchors.right: parent.right

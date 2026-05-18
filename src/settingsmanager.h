@@ -12,6 +12,7 @@ class SettingsManager : public QObject
     Q_PROPERTY(bool launchAtLogin READ launchAtLogin WRITE setLaunchAtLogin NOTIFY launchAtLoginChanged)
     Q_PROPERTY(bool restoreLastSection READ restoreLastSection WRITE setRestoreLastSection NOTIFY restoreLastSectionChanged)
     Q_PROPERTY(bool healthCheckOnActivate READ healthCheckOnActivate WRITE setHealthCheckOnActivate NOTIFY healthCheckOnActivateChanged)
+    Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
     Q_PROPERTY(bool confirmProfileDeletion READ confirmProfileDeletion CONSTANT)
     Q_PROPERTY(bool maskSecrets READ maskSecrets WRITE setMaskSecrets NOTIFY maskSecretsChanged)
     Q_PROPERTY(bool keepBackups READ keepBackups WRITE setKeepBackups NOTIFY keepBackupsChanged)
@@ -45,6 +46,9 @@ public:
 
     bool healthCheckOnActivate() const;
     void setHealthCheckOnActivate(bool healthCheckOnActivate);
+
+    QString language() const;
+    void setLanguage(const QString &language);
 
     bool confirmProfileDeletion() const;
 
@@ -93,6 +97,7 @@ signals:
     void launchAtLoginChanged();
     void restoreLastSectionChanged();
     void healthCheckOnActivateChanged();
+    void languageChanged();
     void maskSecretsChanged();
     void keepBackupsChanged();
     void backupRetentionChanged();
@@ -117,6 +122,7 @@ private:
     bool m_launchAtLogin = false;
     bool m_restoreLastSection = true;
     bool m_healthCheckOnActivate = false;
+    QString m_language = QStringLiteral("en");
     bool m_maskSecrets = true;
     bool m_keepBackups = true;
     QString m_backupRetention = QStringLiteral("14 days");

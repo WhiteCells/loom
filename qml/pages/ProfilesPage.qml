@@ -17,7 +17,11 @@ Item {
     property string editorWarning: ""
     property var editorModelOptions: ["gpt-5.5", "gpt-5.4", "gpt-5.3-codex"]
     property bool editorModelOptionsReady: false
-    property string editorModelMessage: "Enter an endpoint to load model options."
+    property string editorModelMessageKey: "Enter an endpoint to load model options."
+    property string editorModelMessageProvider: ""
+    readonly property string editorModelMessage: editorModelMessageKey === "%1 model options loaded"
+            ? I18n.arg(I18n.t(editorModelMessageKey), editorModelMessageProvider)
+            : I18n.t(editorModelMessageKey)
     readonly property var providers: ["OpenAI", "Anthropic", "Custom"]
     readonly property var efforts: ["low", "medium", "high", "xhigh"]
     readonly property var wireApis: ["responses", "chat"]
@@ -58,13 +62,13 @@ Item {
         if (profile.httpsProxy && profile.httpsProxy.length > 0) {
             lines.push("HTTPS_PROXY=\"" + profile.httpsProxy + "\"")
         }
-        return lines.length > 0 ? lines : ["# No proxy configured"]
+        return lines.length > 0 ? lines : [I18n.t("# No proxy configured")]
     }
 
     function displayHost(url) {
         var value = (url || "").trim()
         if (value.length === 0) {
-            return "Not configured"
+            return I18n.t("Not configured")
         }
 
         value = value.replace(/^https?:\/\//, "")
@@ -79,11 +83,11 @@ Item {
     }
 
     function proxyLabel(value) {
-        return value && value.length > 0 ? value : "Disabled"
+        return value && value.length > 0 ? value : I18n.t("Disabled")
     }
 
     function proxyDetail(value) {
-        return value && value.length > 0 ? "Enabled" : "Direct"
+        return value && value.length > 0 ? I18n.t("Enabled") : I18n.t("Direct")
     }
 
     function filteredProfiles() {
@@ -161,7 +165,8 @@ Item {
         if (endpoint.length === 0) {
             page.editorModelOptions = []
             editorModelBox.currentIndex = -1
-            page.editorModelMessage = "Endpoint required before loading model options."
+            page.editorModelMessageProvider = ""
+            page.editorModelMessageKey = "Endpoint required before loading model options."
             return
         }
 
@@ -173,12 +178,14 @@ Item {
         page.editorModelOptions = options
         editorModelBox.currentIndex = page.indexFor(options, target)
         page.editorModelOptionsReady = true
-        page.editorModelMessage = provider + " model options loaded"
+        page.editorModelMessageProvider = provider
+        page.editorModelMessageKey = "%1 model options loaded"
     }
 
     function markEndpointChanged() {
         page.editorModelOptionsReady = false
-        page.editorModelMessage = page.cleanEndpoint(editorBaseUrlField.text).length === 0
+        page.editorModelMessageProvider = ""
+        page.editorModelMessageKey = page.cleanEndpoint(editorBaseUrlField.text).length === 0
                 ? "Endpoint required before loading model options."
                 : "Endpoint changed. Load options before choosing a model."
     }
@@ -247,12 +254,12 @@ Item {
     function saveEditor() {
         page.editorWarning = ""
         if (editorNameField.text.trim().length === 0) {
-            page.editorWarning = "Profile name is required."
+            page.editorWarning = I18n.t("Profile name is required.")
             editorNameField.forceActiveFocus()
             return
         }
         if (editorNameField.text.indexOf("/") !== -1 || editorNameField.text.indexOf("\\") !== -1) {
-            page.editorWarning = "Profile name cannot contain / or \\."
+            page.editorWarning = I18n.t("Profile name cannot contain / or \\.")
             editorNameField.forceActiveFocus()
             return
         }
@@ -276,7 +283,7 @@ Item {
                 page.saveCurrentInterfaceConfig()
                 profileEditor.close()
             } else {
-                page.editorWarning = profileManager.statusMessage
+                page.editorWarning = I18n.status(profileManager.statusMessage)
             }
             return
         }
@@ -298,13 +305,13 @@ Item {
             page.saveCurrentInterfaceConfig()
             profileEditor.close()
         } else {
-            page.editorWarning = profileManager.statusMessage
+            page.editorWarning = I18n.status(profileManager.statusMessage)
         }
     }
 
     function requestDeleteSelectedProfile(closeEditorAfterDelete) {
         var profile = profileManager.currentProfile
-        page.deleteProfileName = profile.name || "Selected Profile"
+        page.deleteProfileName = profile.name || I18n.t("Selected Profile")
         page.deleteClosesEditor = closeEditorAfterDelete
         deleteConfirmDialog.open()
     }
@@ -349,7 +356,7 @@ Item {
                         spacing: 10
 
                         Text {
-                            text: "Profiles"
+                            text: I18n.t("Profiles")
                             color: Theme.text
                             font.pixelSize: 16
                             font.weight: Font.Bold
@@ -360,7 +367,7 @@ Item {
                         ActionButton {
                             text: ""
                             iconName: "plus"
-                            tooltip: "Create Profile"
+                            tooltip: I18n.t("Create Profile")
                             variant: "primary"
                             implicitWidth: 28
                             implicitHeight: 28
@@ -374,7 +381,7 @@ Item {
                         Layout.leftMargin: 14
                         Layout.rightMargin: 14
                         Layout.bottomMargin: 14
-                        placeholderText: "Search profiles"
+                        placeholderText: I18n.t("Search profiles")
                         onTextEdited: page.profileQuery = text
                     }
 
@@ -412,7 +419,7 @@ Item {
 
                     Text {
                         visible: profileList.count === 0
-                        text: "No profiles found"
+                        text: I18n.t("No profiles found")
                         color: Theme.dim
                         font.pixelSize: 12
                         horizontalAlignment: Text.AlignHCenter
@@ -457,7 +464,7 @@ Item {
                         }
 
                         Text {
-                            text: profileManager.currentProfile.description
+                            text: I18n.status(profileManager.currentProfile.description)
                             color: Theme.muted
                             font.pixelSize: 13
                             width: parent.width
@@ -468,7 +475,7 @@ Item {
                     }
 
                     ActionButton {
-                        text: "Activate"
+                        text: I18n.t("Activate")
                         iconName: "power"
                         variant: profileManager.currentProfile.active ? "secondary" : "primary"
                         enabled: profileManager.profiles.length > 0 && !profileManager.currentProfile.active
@@ -481,7 +488,7 @@ Item {
                     }
 
                     ActionButton {
-                        text: "Edit"
+                        text: I18n.t("Edit")
                         iconName: "pencil"
                         enabled: profileManager.profiles.length > 0
                         Layout.alignment: Qt.AlignVCenter
@@ -489,7 +496,7 @@ Item {
                     }
 
                     ActionButton {
-                        text: "Delete"
+                        text: I18n.t("Delete")
                         iconName: "trash-2"
                         variant: "danger"
                         enabled: profileManager.profiles.length > 1
@@ -532,16 +539,16 @@ Item {
 
                             DetailTile {
                                 iconName: "bot"
-                                title: "Runtime"
-                                value: profileManager.currentProfile.agentType
-                                detail: profileManager.currentProfile.active ? "Currently active" : "Ready to activate"
+                                title: I18n.t("Runtime")
+                                value: I18n.status(profileManager.currentProfile.agentType)
+                                detail: profileManager.currentProfile.active ? I18n.t("Currently active") : I18n.t("Ready to activate")
                                 accent: profileManager.currentProfile.active ? Theme.success : Theme.accent
                                 accentFill: profileManager.currentProfile.active ? Theme.successSoft : Theme.accentSoft
                             }
 
                             DetailTile {
                                 iconName: "sliders-horizontal"
-                                title: "Model"
+                                title: I18n.t("Model")
                                 value: profileManager.currentProfile.model
                                 detail: profileManager.currentProfile.modelProvider
                                 accent: Theme.accentHover
@@ -550,9 +557,9 @@ Item {
 
                             DetailTile {
                                 iconName: "activity"
-                                title: "Effort"
+                                title: I18n.t("Effort")
                                 value: profileManager.currentProfile.reasoningEffort
-                                detail: "Reasoning intensity"
+                                detail: I18n.t("Reasoning intensity")
                                 accent: Theme.warning
                                 accentFill: Theme.warningSoft
                             }
@@ -586,7 +593,7 @@ Item {
                                     }
 
                                     Text {
-                                        text: "Connection & Security"
+                                        text: I18n.t("Connection & Security")
                                         color: Theme.text
                                         font.pixelSize: 15
                                         font.weight: Font.Bold
@@ -596,7 +603,7 @@ Item {
                                     }
 
                                     Pill {
-                                        text: profileManager.currentProfile.maskedApiKey.length > 0 ? "Key saved" : "No key"
+                                        text: profileManager.currentProfile.maskedApiKey.length > 0 ? I18n.t("Key saved") : I18n.t("No key")
                                         iconName: profileManager.currentProfile.maskedApiKey.length > 0 ? "check" : "triangle-alert"
                                         fill: profileManager.currentProfile.maskedApiKey.length > 0 ? Theme.successSoft : Theme.warningSoft
                                         foreground: profileManager.currentProfile.maskedApiKey.length > 0 ? Theme.success : Theme.warning
@@ -605,17 +612,17 @@ Item {
 
                                 DetailValueRow {
                                     iconName: "network"
-                                    label: "Base URL"
+                                    label: I18n.t("Base URL")
                                     value: profileManager.currentProfile.baseUrl
-                                    detail: "Host: " + page.displayHost(profileManager.currentProfile.baseUrl)
+                                    detail: I18n.t("Host: ") + page.displayHost(profileManager.currentProfile.baseUrl)
                                     accent: Theme.accent
                                 }
 
                                 DetailValueRow {
                                     iconName: "key-round"
-                                    label: "API Key"
-                                    value: profileManager.currentProfile.maskedApiKey.length > 0 ? profileManager.currentProfile.maskedApiKey : "Not configured"
-                                    detail: "Secret"
+                                    label: I18n.t("API Key")
+                                    value: profileManager.currentProfile.maskedApiKey.length > 0 ? profileManager.currentProfile.maskedApiKey : I18n.t("Not configured")
+                                    detail: I18n.t("Secret")
                                     accent: profileManager.currentProfile.maskedApiKey.length > 0 ? Theme.success : Theme.warning
                                 }
                             }
@@ -649,7 +656,7 @@ Item {
                                     }
 
                                     Text {
-                                        text: "Proxy Routing"
+                                        text: I18n.t("Proxy Routing")
                                         color: Theme.text
                                         font.pixelSize: 15
                                         font.weight: Font.Bold
@@ -659,7 +666,7 @@ Item {
                                     }
 
                                     Pill {
-                                        text: profileManager.currentProfile.httpProxy.length > 0 || profileManager.currentProfile.httpsProxy.length > 0 ? "Proxy on" : "Direct"
+                                        text: profileManager.currentProfile.httpProxy.length > 0 || profileManager.currentProfile.httpsProxy.length > 0 ? I18n.t("Proxy on") : I18n.t("Direct")
                                         iconName: profileManager.currentProfile.httpProxy.length > 0 || profileManager.currentProfile.httpsProxy.length > 0 ? "check" : "network"
                                         fill: profileManager.currentProfile.httpProxy.length > 0 || profileManager.currentProfile.httpsProxy.length > 0 ? Theme.accentSoft : Theme.panelSoft
                                         foreground: profileManager.currentProfile.httpProxy.length > 0 || profileManager.currentProfile.httpsProxy.length > 0 ? Theme.accentHover : Theme.muted
@@ -674,7 +681,7 @@ Item {
 
                                     DetailValueRow {
                                         iconName: "network"
-                                        label: "HTTP Proxy"
+                                        label: I18n.t("HTTP Proxy")
                                         value: page.proxyLabel(profileManager.currentProfile.httpProxy)
                                         detail: page.proxyDetail(profileManager.currentProfile.httpProxy)
                                         accent: profileManager.currentProfile.httpProxy.length > 0 ? Theme.accent : Theme.muted
@@ -682,7 +689,7 @@ Item {
 
                                     DetailValueRow {
                                         iconName: "network"
-                                        label: "HTTPS Proxy"
+                                        label: I18n.t("HTTPS Proxy")
                                         value: page.proxyLabel(profileManager.currentProfile.httpsProxy)
                                         detail: page.proxyDetail(profileManager.currentProfile.httpsProxy)
                                         accent: profileManager.currentProfile.httpsProxy.length > 0 ? Theme.accent : Theme.muted
@@ -790,7 +797,7 @@ Item {
                     spacing: 4
 
                     Text {
-                        text: page.editorCreating ? "Create Profile" : "Edit Profile"
+                        text: page.editorCreating ? I18n.t("Create Profile") : I18n.t("Edit Profile")
                         color: Theme.text
                         font.pixelSize: 20
                         font.weight: Font.Bold
@@ -811,7 +818,7 @@ Item {
                 ActionButton {
                     text: ""
                     iconName: "x"
-                    tooltip: "Close"
+                    tooltip: I18n.t("Close")
                     implicitWidth: 30
                     implicitHeight: 30
                     onClicked: profileEditor.close()
@@ -849,7 +856,7 @@ Item {
                         spacing: 6
 
                         Text {
-                            text: "Identity"
+                            text: I18n.t("Identity")
                             color: Theme.text
                             font.pixelSize: 14
                             font.weight: Font.Bold
@@ -857,7 +864,7 @@ Item {
                         }
 
                         Text {
-                            text: "Name the profile and choose its model provider."
+                            text: I18n.t("Name the profile and choose its model provider.")
                             color: Theme.muted
                             font.pixelSize: 12
                             Layout.fillWidth: true
@@ -879,7 +886,7 @@ Item {
                             spacing: 8
 
                             Text {
-                                text: "Profile Name"
+                                text: I18n.t("Profile Name")
                                 color: Theme.text
                                 font.pixelSize: 12
                                 font.weight: Font.DemiBold
@@ -908,7 +915,7 @@ Item {
                             spacing: 8
 
                             Text {
-                                text: "Model Provider"
+                                text: I18n.t("Model Provider")
                                 color: Theme.text
                                 font.pixelSize: 12
                                 font.weight: Font.DemiBold
@@ -931,7 +938,7 @@ Item {
                         spacing: 6
 
                         Text {
-                            text: "Codex Runtime"
+                            text: I18n.t("Codex Runtime")
                             color: Theme.text
                             font.pixelSize: 14
                             font.weight: Font.Bold
@@ -939,7 +946,7 @@ Item {
                         }
 
                         Text {
-                            text: "Provider table options written into config.toml."
+                            text: I18n.t("Provider table options written into config.toml.")
                             color: Theme.muted
                             font.pixelSize: 12
                             Layout.fillWidth: true
@@ -961,7 +968,7 @@ Item {
                             spacing: 8
 
                             Text {
-                                text: "Wire API"
+                                text: I18n.t("Wire API")
                                 color: Theme.text
                                 font.pixelSize: 12
                                 font.weight: Font.DemiBold
@@ -985,7 +992,7 @@ Item {
                                 spacing: 6
 
                                 Text {
-                                    text: "Disable Response Storage"
+                                    text: I18n.t("Disable Response Storage")
                                     color: Theme.text
                                     font.pixelSize: 12
                                     font.weight: Font.DemiBold
@@ -1019,7 +1026,7 @@ Item {
                                 spacing: 6
 
                                 Text {
-                                    text: "Requires OpenAI Auth"
+                                    text: I18n.t("Requires OpenAI Auth")
                                     color: Theme.text
                                     font.pixelSize: 12
                                     font.weight: Font.DemiBold
@@ -1051,7 +1058,7 @@ Item {
                         spacing: 6
 
                         Text {
-                            text: "Connection"
+                            text: I18n.t("Connection")
                             color: Theme.text
                             font.pixelSize: 14
                             font.weight: Font.Bold
@@ -1059,7 +1066,7 @@ Item {
                         }
 
                         Text {
-                            text: "Endpoint and key used to load available models."
+                            text: I18n.t("Endpoint and key used to load available models.")
                             color: Theme.muted
                             font.pixelSize: 12
                             Layout.fillWidth: true
@@ -1081,7 +1088,7 @@ Item {
                             spacing: 8
 
                             Text {
-                                text: "Base URL"
+                                text: I18n.t("Base URL")
                                 color: Theme.text
                                 font.pixelSize: 12
                                 font.weight: Font.DemiBold
@@ -1102,7 +1109,7 @@ Item {
                             spacing: 8
 
                             Text {
-                                text: "API Key"
+                                text: I18n.t("API Key")
                                 color: Theme.text
                                 font.pixelSize: 12
                                 font.weight: Font.DemiBold
@@ -1129,7 +1136,7 @@ Item {
                             spacing: 6
 
                             Text {
-                                text: "Model & Effort"
+                                text: I18n.t("Model & Effort")
                                 color: Theme.text
                                 font.pixelSize: 14
                                 font.weight: Font.Bold
@@ -1146,7 +1153,7 @@ Item {
                         }
 
                         ActionButton {
-                            text: "Load from Endpoint"
+                            text: I18n.t("Load from Endpoint")
                             iconName: "refresh-cw"
                             enabled: page.cleanEndpoint(editorBaseUrlField.text).length > 0
                             Layout.alignment: Qt.AlignVCenter
@@ -1168,7 +1175,7 @@ Item {
                             spacing: 8
 
                             Text {
-                                text: "Model"
+                                text: I18n.t("Model")
                                 color: Theme.text
                                 font.pixelSize: 12
                                 font.weight: Font.DemiBold
@@ -1189,7 +1196,7 @@ Item {
                             spacing: 8
 
                             Text {
-                                text: "Reasoning Effort"
+                                text: I18n.t("Reasoning Effort")
                                 color: Theme.text
                                 font.pixelSize: 12
                                 font.weight: Font.DemiBold
@@ -1212,7 +1219,7 @@ Item {
                         spacing: 6
 
                         Text {
-                            text: "Proxy"
+                            text: I18n.t("Proxy")
                             color: Theme.text
                             font.pixelSize: 14
                             font.weight: Font.Bold
@@ -1220,7 +1227,7 @@ Item {
                         }
 
                         Text {
-                            text: "Optional local routing applied after the provider and model are selected."
+                            text: I18n.t("Optional local routing applied after the provider and model are selected.")
                             color: Theme.muted
                             font.pixelSize: 12
                             Layout.fillWidth: true
@@ -1242,7 +1249,7 @@ Item {
                             spacing: 8
 
                             Text {
-                                text: "HTTP Proxy"
+                                text: I18n.t("HTTP Proxy")
                                 color: Theme.text
                                 font.pixelSize: 12
                                 font.weight: Font.DemiBold
@@ -1262,7 +1269,7 @@ Item {
                             spacing: 8
 
                             Text {
-                                text: "HTTPS Proxy"
+                                text: I18n.t("HTTPS Proxy")
                                 color: Theme.text
                                 font.pixelSize: 12
                                 font.weight: Font.DemiBold
@@ -1298,7 +1305,7 @@ Item {
                 spacing: 10
 
                 ActionButton {
-                    text: "Delete"
+                    text: I18n.t("Delete")
                     iconName: "trash-2"
                     variant: "danger"
                     visible: !page.editorCreating
@@ -1311,13 +1318,13 @@ Item {
                 }
 
                 ActionButton {
-                    text: "Cancel"
+                    text: I18n.t("Cancel")
                     iconName: "x"
                     onClicked: profileEditor.close()
                 }
 
                 ActionButton {
-                    text: "Save Profile"
+                    text: I18n.t("Save Profile")
                     iconName: "save"
                     variant: "primary"
                     onClicked: page.saveEditor()
@@ -1402,7 +1409,7 @@ Item {
                     spacing: 4
 
                     Text {
-                        text: "Delete Profile?"
+                        text: I18n.t("Delete Profile?")
                         color: Theme.text
                         font.pixelSize: 18
                         font.weight: Font.Bold
@@ -1422,7 +1429,7 @@ Item {
                 ActionButton {
                     text: ""
                     iconName: "x"
-                    tooltip: "Cancel"
+                    tooltip: I18n.t("Cancel")
                     implicitWidth: 30
                     implicitHeight: 30
                     Layout.alignment: Qt.AlignVCenter
@@ -1445,7 +1452,7 @@ Item {
                 spacing: 8
 
                 Text {
-                    text: "This will remove the selected configuration from Loom."
+                    text: I18n.t("This will remove the selected configuration from Loom.")
                     color: Theme.text
                     font.pixelSize: 13
                     Layout.fillWidth: true
@@ -1453,7 +1460,7 @@ Item {
                 }
 
                 Text {
-                    text: "This action cannot be undone."
+                    text: I18n.t("This action cannot be undone.")
                     color: Theme.danger
                     font.pixelSize: 12
                     font.weight: Font.DemiBold
@@ -1474,13 +1481,13 @@ Item {
                 }
 
                 ActionButton {
-                    text: "Cancel"
+                    text: I18n.t("Cancel")
                     iconName: "x"
                     onClicked: deleteConfirmDialog.close()
                 }
 
                 ActionButton {
-                    text: "Delete"
+                    text: I18n.t("Delete")
                     iconName: "trash-2"
                     variant: "danger"
                     onClicked: page.confirmDeleteSelectedProfile()

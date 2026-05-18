@@ -13,6 +13,10 @@ qt_standard_project_setup(REQUIRES 6.5)
 qt6_policy(SET QTP0004 NEW)
 
 set_source_files_properties(qml/Main.qml PROPERTIES QT_RESOURCE_ALIAS Main.qml)
+set_source_files_properties(qml/I18n.qml PROPERTIES
+    QT_QML_SINGLETON_TYPE TRUE
+    QT_RESOURCE_ALIAS I18n.qml
+)
 set_source_files_properties(qml/Theme.qml PROPERTIES
     QT_QML_SINGLETON_TYPE TRUE
     QT_RESOURCE_ALIAS Theme.qml
@@ -50,6 +54,7 @@ qt_add_qml_module(${PROJECT_NAME}
     VERSION 1.0
     QML_FILES
         qml/Main.qml
+        qml/I18n.qml
         qml/Theme.qml
         qml/components/ActionButton.qml
         qml/components/CodeCard.qml

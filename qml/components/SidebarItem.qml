@@ -77,7 +77,7 @@ Item {
     Pill {
         id: statusPill
         visible: control.activeProfile
-        text: "Active"
+        text: I18n.t("Active")
         anchors.right: parent.right
         anchors.rightMargin: 14
         anchors.verticalCenter: parent.verticalCenter

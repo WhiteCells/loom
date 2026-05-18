@@ -29,7 +29,7 @@ Item {
                     spacing: 8
 
                     Text {
-                        text: "Health Checks"
+                        text: I18n.t("Health Checks")
                         color: Theme.text
                         font.pixelSize: 26
                         font.weight: Font.Bold
@@ -38,7 +38,7 @@ Item {
                     }
 
                     Text {
-                        text: profileManager.dashboard.healthDetail
+                        text: I18n.status(profileManager.dashboard.healthDetail)
                         color: Theme.muted
                         font.pixelSize: 13
                         height: 18
@@ -47,7 +47,7 @@ Item {
                 }
 
                 ActionButton {
-                    text: "Run Health Check"
+                    text: I18n.t("Run Health Check")
                     iconName: "refresh-cw"
                     variant: "primary"
                     onClicked: profileManager.runHealthCheck()
@@ -72,7 +72,7 @@ Item {
                         Layout.preferredHeight: 44
 
                         Text {
-                            text: "Profile"
+                            text: I18n.t("Profile")
                             color: Theme.muted
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
@@ -83,7 +83,7 @@ Item {
                         }
 
                         Text {
-                            text: "Endpoint"
+                            text: I18n.t("Endpoint")
                             color: Theme.muted
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
@@ -93,7 +93,7 @@ Item {
                         }
 
                         Text {
-                            text: "Checked At"
+                            text: I18n.t("Checked At")
                             color: Theme.muted
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
@@ -102,7 +102,7 @@ Item {
                         }
 
                         Text {
-                            text: "Status"
+                            text: I18n.t("Status")
                             color: Theme.muted
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
@@ -111,7 +111,7 @@ Item {
                         }
 
                         Text {
-                            text: "Latency"
+                            text: I18n.t("Latency")
                             color: Theme.muted
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
