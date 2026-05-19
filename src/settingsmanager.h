@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QJsonObject>
 #include <QVariantMap>
 
 class SettingsManager : public QObject
@@ -114,6 +115,7 @@ private:
     bool loadFromDisk(bool announce);
     void persistAfterChange();
     void setStatusMessage(const QString &message);
+    QJsonObject toJsonObject(bool includeUpdatedAt) const;
     bool writeSettingsToDisk(bool announce);
 
     bool m_darkTheme = true;

@@ -429,7 +429,7 @@ bool ProfileManager::saveConfiguration(const QString &name,
         }
     }
 
-    const QString previousFolderName = profile->folderName;
+    const Profile previousProfile = *profile;
     applyConfiguration(*profile,
                        name,
                        agentType,
@@ -443,12 +443,13 @@ bool ProfileManager::saveConfiguration(const QString &name,
                        disableResponseStorage,
                        wireApi,
                        requiresOpenAiAuth);
-    if (!writeProfileToDisk(profile, previousFolderName)) {
-        profile->folderName = previousFolderName;
+    if (!writeProfileToDisk(profile, previousProfile.folderName)) {
+        *profile = previousProfile;
         return false;
     }
 
     if (profile->active && !applySelectedProfileToCodex()) {
+        *profile = previousProfile;
         emitDataChanged();
         return false;
     }

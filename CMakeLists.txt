@@ -48,6 +48,10 @@ qt_add_executable(${PROJECT_NAME}
     src/profilemanager.h
     src/settingsmanager.cc
     src/settingsmanager.h
+    src/singleinstanceguard.cc
+    src/singleinstanceguard.h
+    src/traycontroller.cc
+    src/traycontroller.h
 )
 
 qt_add_qml_module(${PROJECT_NAME}

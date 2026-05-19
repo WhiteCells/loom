@@ -16,6 +16,7 @@ Item {
     property string deleteProfileName: ""
     property string editorWarning: ""
     property var editorModelOptions: ["gpt-5.5", "gpt-5.4", "gpt-5.3-codex"]
+    property var visibleProfiles: []
     property bool editorModelOptionsReady: false
     property string editorModelMessageKey: "Enter an endpoint to load model options."
     property string editorModelMessageProvider: ""
@@ -90,9 +91,9 @@ Item {
         return value && value.length > 0 ? I18n.t("Enabled") : I18n.t("Direct")
     }
 
-    function filteredProfiles() {
-        var source = profileManager.profiles
-        var query = page.profileQuery.trim().toLowerCase()
+    function filteredProfiles(sourceProfiles, queryText) {
+        var source = sourceProfiles || []
+        var query = (queryText || "").trim().toLowerCase()
         if (query.length === 0) {
             return source
         }
@@ -113,6 +114,10 @@ Item {
             }
         }
         return result
+    }
+
+    function refreshVisibleProfiles() {
+        page.visibleProfiles = page.filteredProfiles(profileManager.profiles, page.profileQuery)
     }
 
     function indexFor(values, value) {
@@ -326,6 +331,18 @@ Item {
         page.deleteProfileName = ""
     }
 
+    onProfileQueryChanged: page.refreshVisibleProfiles()
+
+    Component.onCompleted: page.refreshVisibleProfiles()
+
+    Connections {
+        target: profileManager
+
+        function onProfilesChanged() {
+            page.refreshVisibleProfiles()
+        }
+    }
+
     Rectangle {
         anchors.fill: parent
         radius: Theme.cardRadius
@@ -395,7 +412,7 @@ Item {
                         id: profileList
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        model: page.filteredProfiles()
+                        model: page.visibleProfiles
                         clip: true
                         boundsBehavior: Flickable.StopAtBounds
                         currentIndex: profileManager.selectedProfileIndex

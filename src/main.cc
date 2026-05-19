@@ -1,25 +1,18 @@
 #include <QCoreApplication>
-#include <QAction>
 #include <QApplication>
-#include <QDir>
 #include <QIcon>
-#include <QIODevice>
-#include <QLocalServer>
-#include <QLocalSocket>
-#include <QMenu>
 #include <QProcess>
-#include <QStandardPaths>
 #include <QString>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
-#include <QSystemTrayIcon>
-#include <QVariantList>
 #include <QVariantMap>
 #include <QWindow>
 
 #include "profilemanager.h"
 #include "settingsmanager.h"
+#include "singleinstanceguard.h"
+#include "traycontroller.h"
 
 #ifdef Q_OS_WIN
 #ifndef WIN32_LEAN_AND_MEAN
@@ -37,8 +30,6 @@
 #endif
 
 namespace {
-constexpr int kInstanceWaitMs = 350;
-
 #ifdef Q_OS_WIN
 #ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
@@ -81,57 +72,6 @@ void applyWindowsTitleBarTheme(QWindow *, bool)
 }
 #endif
 
-QString singleInstanceRuntimePath(const QString &fileName)
-{
-    QString runtimePath = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
-    if (runtimePath.isEmpty()) {
-        runtimePath = QDir::tempPath();
-    }
-
-    QDir runtimeDir(runtimePath);
-    runtimeDir.mkpath(QStringLiteral("."));
-    return runtimeDir.absoluteFilePath(fileName);
-}
-
-QString singleInstanceServerName()
-{
-#ifdef Q_OS_UNIX
-    return singleInstanceRuntimePath(QStringLiteral("loom-desktop.sock"));
-#else
-    return QStringLiteral("LoomDesktop.SingleInstance");
-#endif
-}
-
-bool notifyRunningInstance(const QString &serverName)
-{
-    QLocalSocket instanceSocket;
-    instanceSocket.connectToServer(serverName, QIODevice::WriteOnly);
-    if (!instanceSocket.waitForConnected(kInstanceWaitMs)) {
-        return false;
-    }
-
-    instanceSocket.write("show");
-    instanceSocket.flush();
-    instanceSocket.waitForBytesWritten(kInstanceWaitMs);
-    instanceSocket.disconnectFromServer();
-    return true;
-}
-
-bool listenForSingleInstance(QLocalServer &server, const QString &serverName)
-{
-    server.setSocketOptions(QLocalServer::UserAccessOption);
-    if (server.listen(serverName)) {
-        return true;
-    }
-
-    if (notifyRunningInstance(serverName)) {
-        return false;
-    }
-
-    QLocalServer::removeServer(serverName);
-    return server.listen(serverName);
-}
-
 bool hasArgument(int argc, char *argv[], const QString &argument)
 {
     for (int i = 1; i < argc; ++i) {
@@ -163,9 +103,8 @@ int main(int argc, char *argv[])
     const QIcon appIcon(QStringLiteral(":/assets/icons/loom-app.svg"));
     app.setWindowIcon(appIcon);
 
-    const QString instanceServerName = singleInstanceServerName();
-    QLocalServer instanceServer;
-    if (!listenForSingleInstance(instanceServer, instanceServerName)) {
+    SingleInstanceGuard instanceGuard;
+    if (!instanceGuard.start()) {
         return 0;
     }
 
@@ -230,136 +169,27 @@ int main(int argc, char *argv[])
         mainWindow->raise();
         mainWindow->requestActivate();
     };
+    QObject::connect(&instanceGuard, &SingleInstanceGuard::activationRequested, &app, showMainWindow);
 
-    const auto handleInstanceActivation = [&instanceServer, showMainWindow] {
-        while (QLocalSocket *client = instanceServer.nextPendingConnection()) {
-            client->readAll();
-            showMainWindow();
-            client->disconnectFromServer();
-            client->deleteLater();
-        }
-    };
+    TrayController trayController(appIcon, &settingsManager);
+    trayController.setMainWindow(mainWindow);
+    app.setQuitOnLastWindowClosed(!trayController.isAvailable());
 
-    QObject::connect(&instanceServer, &QLocalServer::newConnection, &app, handleInstanceActivation);
-    handleInstanceActivation();
-
-    const bool trayAvailable = QSystemTrayIcon::isSystemTrayAvailable();
-    app.setQuitOnLastWindowClosed(!trayAvailable);
-
-    QMenu trayMenu;
-    const QString trayMenuStyle = QStringLiteral(R"(
-        QMenu {
-            padding: 7px 0;
-        }
-        QMenu::item {
-            min-width: 184px;
-            padding: 7px 36px 7px 18px;
-        }
-        QMenu::item:selected {
-            background: rgba(14, 114, 240, 0.14);
-        }
-        QMenu::separator {
-            height: 1px;
-            margin: 6px 12px;
-            background: rgba(127, 127, 127, 0.24);
-        }
-        QMenu::right-arrow {
-            width: 12px;
-            height: 12px;
-            padding-right: 14px;
-        }
-        QMenu::indicator {
-            width: 16px;
-            height: 16px;
-            left: 12px;
-        }
-    )");
-    trayMenu.setStyleSheet(trayMenuStyle);
-
-    QAction *showAction = trayMenu.addAction(QStringLiteral("Show Loom"));
-    trayMenu.addSeparator();
-
-    QMenu *profilesMenu = trayMenu.addMenu(QStringLiteral("Switch Profile"));
-    profilesMenu->setStyleSheet(trayMenuStyle);
-    trayMenu.addSeparator();
-
-    QAction *restartAction = trayMenu.addAction(QStringLiteral("Restart"));
-    QAction *quitAction = trayMenu.addAction(QStringLiteral("Quit Loom"));
-
-    bool profilesMenuDirty = true;
-    const auto rebuildProfilesMenu = [&profileManager, &settingsManager, profilesMenu, &profilesMenuDirty] {
-        profilesMenuDirty = false;
-        profilesMenu->clear();
-
-        const QVariantList profiles = profileManager.profiles();
-        if (profiles.isEmpty()) {
-            QAction *emptyAction = profilesMenu->addAction(QStringLiteral("No profiles"));
-            emptyAction->setEnabled(false);
-            return;
-        }
-
-        for (const QVariant &item : profiles) {
-            const QVariantMap profile = item.toMap();
-            const QString name = profile.value(QStringLiteral("name")).toString();
-            const QString provider = profile.value(QStringLiteral("modelProvider")).toString();
-            const int index = profile.value(QStringLiteral("index")).toInt();
-
-            QAction *profileAction = profilesMenu->addAction(QStringLiteral("%1  ·  %2").arg(name, provider));
-            profileAction->setCheckable(true);
-            profileAction->setChecked(profile.value(QStringLiteral("active")).toBool());
-
-            QObject::connect(profileAction, &QAction::triggered, profilesMenu, [&profileManager, &settingsManager, index] {
-                profileManager.selectProfile(index);
-                const bool activated = profileManager.activateSelectedProfile();
-                if (activated) {
-                    settingsManager.setActiveProfileFolder(profileManager.currentProfile().value(QStringLiteral("folderName")).toString());
-                }
-                if (activated && settingsManager.healthCheckOnActivate()) {
-                    profileManager.runHealthCheck();
-                }
-            });
-        }
-    };
-    const auto markProfilesMenuDirty = [&profilesMenuDirty] {
-        profilesMenuDirty = true;
-    };
-
-    rebuildProfilesMenu();
-
-    QObject::connect(showAction, &QAction::triggered, &app, showMainWindow);
-    QObject::connect(profilesMenu, &QMenu::aboutToShow, &app, [&rebuildProfilesMenu, &profilesMenuDirty] {
-        if (profilesMenuDirty) {
-            rebuildProfilesMenu();
-        }
-    });
-    QObject::connect(&profileManager, &ProfileManager::profilesChanged, &app, markProfilesMenuDirty);
-
-    QObject::connect(restartAction, &QAction::triggered, &app, [&app, &instanceServer, instanceServerName] {
+    QObject::connect(&trayController, &TrayController::restartRequested, &app, [&app, &instanceGuard] {
         QStringList arguments = QCoreApplication::arguments();
         if (!arguments.isEmpty()) {
             arguments.removeFirst();
         }
 
-        instanceServer.close();
-        QLocalServer::removeServer(instanceServerName);
+        instanceGuard.release();
         QProcess::startDetached(QCoreApplication::applicationFilePath(), arguments);
         app.quit();
     });
 
-    QObject::connect(quitAction, &QAction::triggered, &app, &QCoreApplication::quit);
+    QObject::connect(&trayController, &TrayController::quitRequested, &app, &QCoreApplication::quit);
 
-    QSystemTrayIcon trayIcon(appIcon);
-    trayIcon.setToolTip(QStringLiteral("Loom"));
-    trayIcon.setContextMenu(&trayMenu);
-
-    QObject::connect(&trayIcon, &QSystemTrayIcon::activated, &app, [showMainWindow](QSystemTrayIcon::ActivationReason reason) {
-        if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick) {
-            showMainWindow();
-        }
-    });
-
-    if (trayAvailable) {
-        trayIcon.show();
+    if (trayController.isAvailable()) {
+        trayController.show();
     }
 
     return app.exec();

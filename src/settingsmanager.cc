@@ -349,38 +349,7 @@ QString SettingsManager::statusMessage() const
 
 QVariantMap SettingsManager::values() const
 {
-    QVariantMap appearance;
-    appearance.insert(QStringLiteral("theme"), m_darkTheme ? QStringLiteral("Dark") : QStringLiteral("Light"));
-    appearance.insert(QStringLiteral("density"), m_density);
-    appearance.insert(QStringLiteral("accentIndex"), m_accentIndex);
-    appearance.insert(QStringLiteral("language"), m_language);
-
-    QVariantMap behavior;
-    behavior.insert(QStringLiteral("launchAtLogin"), m_launchAtLogin);
-    behavior.insert(QStringLiteral("restoreLastSection"), m_restoreLastSection);
-    behavior.insert(QStringLiteral("healthCheckOnActivate"), m_healthCheckOnActivate);
-    behavior.insert(QStringLiteral("confirmProfileDeletion"), confirmProfileDeletion());
-    behavior.insert(QStringLiteral("lastSection"), m_lastSection);
-
-    QVariantMap profiles;
-    profiles.insert(QStringLiteral("selectedProfileFolder"), m_selectedProfileFolder);
-    profiles.insert(QStringLiteral("activeProfileFolder"), m_activeProfileFolder);
-
-    QVariantMap storage;
-    storage.insert(QStringLiteral("dataLocation"), dataLocation());
-    storage.insert(QStringLiteral("maskSecrets"), m_maskSecrets);
-    storage.insert(QStringLiteral("keepBackups"), m_keepBackups);
-    storage.insert(QStringLiteral("backupRetention"), m_backupRetention);
-
-    QVariantMap result;
-    result.insert(QStringLiteral("version"), kSettingsVersion);
-    result.insert(QStringLiteral("settingsPath"), settingsPath());
-    result.insert(QStringLiteral("appearance"), appearance);
-    result.insert(QStringLiteral("behavior"), behavior);
-    result.insert(QStringLiteral("profiles"), profiles);
-    result.insert(QStringLiteral("interfaceConfig"), interfaceConfig());
-    result.insert(QStringLiteral("storage"), storage);
-    return result;
+    return toJsonObject(false).toVariantMap();
 }
 
 bool SettingsManager::reload()
@@ -583,12 +552,8 @@ void SettingsManager::setStatusMessage(const QString &message)
     emit statusMessageChanged();
 }
 
-bool SettingsManager::writeSettingsToDisk(bool announce)
+QJsonObject SettingsManager::toJsonObject(bool includeUpdatedAt) const
 {
-    if (!ensureSettingsRoot()) {
-        return false;
-    }
-
     QJsonObject appearance;
     appearance.insert(QStringLiteral("theme"), m_darkTheme ? QStringLiteral("Dark") : QStringLiteral("Light"));
     appearance.insert(QStringLiteral("density"), m_density);
@@ -626,12 +591,26 @@ bool SettingsManager::writeSettingsToDisk(bool announce)
 
     QJsonObject root;
     root.insert(QStringLiteral("version"), kSettingsVersion);
-    root.insert(QStringLiteral("updatedAt"), QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
+    if (includeUpdatedAt) {
+        root.insert(QStringLiteral("updatedAt"), QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
+    } else {
+        root.insert(QStringLiteral("settingsPath"), settingsPath());
+    }
     root.insert(QStringLiteral("appearance"), appearance);
     root.insert(QStringLiteral("behavior"), behavior);
     root.insert(QStringLiteral("profiles"), profiles);
     root.insert(QStringLiteral("interfaceConfig"), interfaceConfig);
     root.insert(QStringLiteral("storage"), storage);
+    return root;
+}
+
+bool SettingsManager::writeSettingsToDisk(bool announce)
+{
+    if (!ensureSettingsRoot()) {
+        return false;
+    }
+
+    const QByteArray data = QJsonDocument(toJsonObject(true)).toJson(QJsonDocument::Indented);
 
     QSaveFile file(settingsPath());
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -639,7 +618,7 @@ bool SettingsManager::writeSettingsToDisk(bool announce)
         return false;
     }
 
-    if (file.write(QJsonDocument(root).toJson(QJsonDocument::Indented)) == -1 || !file.commit()) {
+    if (file.write(data) != data.size() || !file.commit()) {
         setStatusMessage(QStringLiteral("Failed to save %1").arg(settingsPath()));
         return false;
     }
