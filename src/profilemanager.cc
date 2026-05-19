@@ -1,11 +1,13 @@
 #include "profilemanager.h"
 
 #include <QByteArray>
+#include <QDate>
 #include <QFile>
 #include <QFileInfo>
 #include <QHash>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonValue>
 #include <QSaveFile>
 #include <QTextStream>
 #include <QDateTime>
@@ -121,6 +123,55 @@ bool tomlBool(const QHash<QString, QString> &values, const QString &key, bool fa
     }
     return fallback;
 }
+
+qint64 jsonInteger(const QJsonObject &object, const QString &key)
+{
+    const QJsonValue value = object.value(key);
+    if (value.isDouble()) {
+        return static_cast<qint64>(value.toDouble());
+    }
+    if (value.isString()) {
+        bool ok = false;
+        const qint64 result = value.toString().toLongLong(&ok);
+        return ok ? result : 0;
+    }
+    return 0;
+}
+
+QString displayDateTime(const QString &isoTimestamp)
+{
+    QDateTime dateTime = QDateTime::fromString(isoTimestamp, Qt::ISODateWithMs);
+    if (dateTime.isValid()) {
+        return dateTime.toLocalTime().toString(QStringLiteral("yyyy-MM-dd hh:mm"));
+    }
+
+    const QDateTime fallback = QDateTime::fromString(isoTimestamp, Qt::ISODate);
+    return fallback.isValid() ? fallback.toLocalTime().toString(QStringLiteral("yyyy-MM-dd hh:mm")) : isoTimestamp;
+}
+
+int timestampHour(const QString &isoTimestamp)
+{
+    QDateTime dateTime = QDateTime::fromString(isoTimestamp, Qt::ISODateWithMs);
+    if (!dateTime.isValid()) {
+        dateTime = QDateTime::fromString(isoTimestamp, Qt::ISODate);
+    }
+    return dateTime.isValid() ? dateTime.toLocalTime().time().hour() : 0;
+}
+
+QString displayRelativeDate(const QDate &date)
+{
+    const QDate today = QDate::currentDate();
+    if (date == today) {
+        return QStringLiteral("Today");
+    }
+    if (date == today.addDays(-1)) {
+        return QStringLiteral("Yesterday");
+    }
+    if (date == today.addDays(1)) {
+        return QStringLiteral("Tomorrow");
+    }
+    return date.toString(QStringLiteral("yyyy-MM-dd"));
+}
 }
 
 ProfileManager::ProfileManager(QObject *parent)
@@ -129,6 +180,10 @@ ProfileManager::ProfileManager(QObject *parent)
 {
     ensureProfileRoot();
     loadProfilesFromDisk();
+    m_tokenSelectedDate = QDate::currentDate();
+    m_tokenRangeStartDate = m_tokenSelectedDate;
+    m_tokenRangeEndDate = m_tokenSelectedDate;
+    loadTodayTokenUsage();
 
     if (m_profiles.isEmpty()) {
         setStatusMessage(QStringLiteral("Create a profile to begin"));
@@ -180,9 +235,6 @@ QVariantMap ProfileManager::dashboard() const
     });
 
     const Profile *activeProfile = activeIt == m_profiles.cend() ? selectedProfile() : &(*activeIt);
-    const int totalTokens = std::accumulate(m_profiles.cbegin(), m_profiles.cend(), 0, [](int total, const Profile &profile) {
-        return total + profile.todayTokens;
-    });
     const int healthyCount = std::count_if(m_healthChecks.cbegin(), m_healthChecks.cend(), [](const HealthCheck &check) {
         return check.status == QStringLiteral("OK");
     });
@@ -193,8 +245,8 @@ QVariantMap ProfileManager::dashboard() const
     result.insert(QStringLiteral("systemHealth"), healthyCount == m_healthChecks.size() ? QStringLiteral("All Systems Go") : QStringLiteral("Needs Attention"));
     result.insert(QStringLiteral("healthDetail"), QStringLiteral("%1 of %2 checks healthy").arg(healthyCount).arg(m_healthChecks.size()));
     result.insert(QStringLiteral("lastChecked"), m_healthChecks.isEmpty() ? QStringLiteral("No checks yet") : QStringLiteral("Last checked at %1").arg(m_healthChecks.first().checkedAt));
-    result.insert(QStringLiteral("tokensToday"), totalTokens);
-    result.insert(QStringLiteral("tokenDetail"), QStringLiteral("Across %1 profiles").arg(m_profiles.size()));
+    result.insert(QStringLiteral("tokensToday"), m_tokenTodayTotals.totalTokens);
+    result.insert(QStringLiteral("tokenDetail"), QStringLiteral("Across %1 sessions").arg(m_tokenTodaySessionCount));
 
     return result;
 }
@@ -227,6 +279,49 @@ int ProfileManager::selectedProfileIndex() const
 QString ProfileManager::statusMessage() const
 {
     return m_statusMessage;
+}
+
+QVariantList ProfileManager::tokenDailySeries() const
+{
+    QVariantList list;
+    list.reserve(m_tokenDailySeries.size());
+    for (const TokenDay &day : m_tokenDailySeries) {
+        list.append(tokenDayToMap(day));
+    }
+    return list;
+}
+
+QVariantList ProfileManager::tokenSessions() const
+{
+    QVariantList list;
+    list.reserve(m_tokenSessions.size());
+    for (const TokenSession &session : m_tokenSessions) {
+        list.append(tokenSessionToMap(session));
+    }
+    return list;
+}
+
+QVariantMap ProfileManager::tokenSummary() const
+{
+    QVariantMap map = tokenTotalsToMap(m_tokenSelectedTotals);
+    map.insert(QStringLiteral("date"), m_tokenRangeStartDate == m_tokenRangeEndDate
+                                             ? m_tokenRangeStartDate.toString(QStringLiteral("yyyy-MM-dd"))
+                                             : QStringLiteral("%1 - %2")
+                                                   .arg(m_tokenRangeStartDate.toString(QStringLiteral("yyyy-MM-dd")),
+                                                        m_tokenRangeEndDate.toString(QStringLiteral("yyyy-MM-dd"))));
+    map.insert(QStringLiteral("dateLabel"), m_tokenRangeStartDate == m_tokenRangeEndDate
+                                                  ? displayRelativeDate(m_tokenRangeStartDate)
+                                                  : QStringLiteral("%1 days")
+                                                        .arg(m_tokenRangeStartDate.daysTo(m_tokenRangeEndDate) + 1));
+    map.insert(QStringLiteral("startDate"), m_tokenRangeStartDate.toString(QStringLiteral("yyyy-MM-dd")));
+    map.insert(QStringLiteral("startDateLabel"), displayRelativeDate(m_tokenRangeStartDate));
+    map.insert(QStringLiteral("endDate"), m_tokenRangeEndDate.toString(QStringLiteral("yyyy-MM-dd")));
+    map.insert(QStringLiteral("endDateLabel"), displayRelativeDate(m_tokenRangeEndDate));
+    map.insert(QStringLiteral("sessionCount"), m_tokenSessions.size());
+    map.insert(QStringLiteral("contextWindow"), m_tokenSelectedContextWindow);
+    map.insert(QStringLiteral("lastUpdated"), m_tokenLastUpdated.isEmpty() ? QStringLiteral("No token events") : m_tokenLastUpdated);
+    map.insert(QStringLiteral("sessionsPath"), m_tokenSessionsPath);
+    return map;
 }
 
 QVariantList ProfileManager::tokenUsage() const
@@ -550,7 +645,72 @@ bool ProfileManager::setActiveProfileByFolderName(const QString &folderName)
 
 void ProfileManager::selectSection(const QString &section)
 {
+    if (section == QStringLiteral("Token Usage") && !m_tokenUsageLoaded) {
+        loadTokenUsage();
+    }
     setActiveSection(section);
+}
+
+void ProfileManager::shiftTokenDate(int days)
+{
+    if (!m_tokenSelectedDate.isValid()) {
+        m_tokenSelectedDate = QDate::currentDate();
+    }
+
+    m_tokenSelectedDate = m_tokenSelectedDate.addDays(days);
+    m_tokenRangeStartDate = m_tokenSelectedDate;
+    m_tokenRangeEndDate = m_tokenSelectedDate;
+    loadTokenUsage();
+    setStatusMessage(QStringLiteral("Token usage loaded for %1").arg(m_tokenSelectedDate.toString(QStringLiteral("yyyy-MM-dd"))));
+}
+
+void ProfileManager::shiftTokenRangeStart(int days)
+{
+    normalizeTokenRange();
+    m_tokenRangeStartDate = m_tokenRangeStartDate.addDays(days);
+    normalizeTokenRange();
+    loadTokenUsage();
+    setStatusMessage(QStringLiteral("Token usage loaded for %1").arg(tokenSummary().value(QStringLiteral("date")).toString()));
+}
+
+void ProfileManager::shiftTokenRangeEnd(int days)
+{
+    normalizeTokenRange();
+    m_tokenRangeEndDate = m_tokenRangeEndDate.addDays(days);
+    normalizeTokenRange();
+    loadTokenUsage();
+    setStatusMessage(QStringLiteral("Token usage loaded for %1").arg(tokenSummary().value(QStringLiteral("date")).toString()));
+}
+
+void ProfileManager::setTokenDateRange(const QString &startDate, const QString &endDate)
+{
+    const QDate parsedStart = QDate::fromString(startDate, QStringLiteral("yyyy-MM-dd"));
+    const QDate parsedEnd = QDate::fromString(endDate, QStringLiteral("yyyy-MM-dd"));
+    if (parsedStart.isValid()) {
+        m_tokenRangeStartDate = parsedStart;
+    }
+    if (parsedEnd.isValid()) {
+        m_tokenRangeEndDate = parsedEnd;
+    }
+    normalizeTokenRange();
+    loadTokenUsage();
+    setStatusMessage(QStringLiteral("Token usage loaded for %1").arg(tokenSummary().value(QStringLiteral("date")).toString()));
+}
+
+void ProfileManager::setTokenRecentRange(int days)
+{
+    const int normalizedDays = std::max(1, days);
+    m_tokenRangeEndDate = QDate::currentDate();
+    m_tokenRangeStartDate = m_tokenRangeEndDate.addDays(-(normalizedDays - 1));
+    normalizeTokenRange();
+    loadTokenUsage();
+    setStatusMessage(QStringLiteral("Token usage loaded for %1").arg(tokenSummary().value(QStringLiteral("date")).toString()));
+}
+
+void ProfileManager::refreshTokenUsage()
+{
+    loadTokenUsage();
+    setStatusMessage(QStringLiteral("Token usage refreshed"));
 }
 
 QVariantMap ProfileManager::healthCheckToMap(const HealthCheck &check) const
@@ -645,6 +805,11 @@ QString ProfileManager::profileFolderName(const QString &profileName) const
 QDir ProfileManager::profileRootDir() const
 {
     return QDir(QDir::current().filePath(QStringLiteral("loomprofile")));
+}
+
+QDir ProfileManager::codexSessionsRootDir() const
+{
+    return QDir(QDir::homePath() + QStringLiteral("/.codex/sessions"));
 }
 
 bool ProfileManager::isValidProfileName(const QString &name) const
@@ -754,6 +919,348 @@ bool ProfileManager::readProfileFromDirectory(const QString &folderName, Profile
     return QFileInfo::exists(dir.filePath(QStringLiteral(".env")))
         || QFileInfo::exists(dir.filePath(QStringLiteral("config.toml")))
         || QFileInfo::exists(dir.filePath(QStringLiteral("auth.json")));
+}
+
+void ProfileManager::loadTodayTokenUsage()
+{
+    const QDate today = QDate::currentDate();
+    qint64 contextWindow = 0;
+    QString lastUpdated;
+    const QVector<TokenSession> sessions = readTokenSessionsForDate(today, &m_tokenTodayTotals, &contextWindow, &lastUpdated);
+    m_tokenTodaySessionCount = static_cast<int>(sessions.size());
+
+    if (m_tokenSelectedDate == today) {
+        m_tokenSessions = sessions;
+        m_tokenSelectedTotals = m_tokenTodayTotals;
+        m_tokenSelectedContextWindow = contextWindow;
+        m_tokenLastUpdated = lastUpdated.isEmpty() ? QString() : displayDateTime(lastUpdated);
+        m_tokenSessionsPath = codexSessionsRootDir().filePath(m_tokenSelectedDate.toString(QStringLiteral("yyyy/MM/dd")));
+    }
+
+    emit tokenUsageChanged();
+    emit dashboardChanged();
+}
+
+void ProfileManager::normalizeTokenRange()
+{
+    const QDate today = QDate::currentDate();
+    if (!m_tokenRangeStartDate.isValid()) {
+        m_tokenRangeStartDate = m_tokenSelectedDate.isValid() ? m_tokenSelectedDate : today;
+    }
+    if (!m_tokenRangeEndDate.isValid()) {
+        m_tokenRangeEndDate = m_tokenRangeStartDate;
+    }
+    if (m_tokenRangeStartDate > m_tokenRangeEndDate) {
+        std::swap(m_tokenRangeStartDate, m_tokenRangeEndDate);
+    }
+    m_tokenSelectedDate = m_tokenRangeEndDate;
+}
+
+void ProfileManager::loadTokenUsage()
+{
+    normalizeTokenRange();
+
+    m_tokenDailySeries.clear();
+    m_tokenSessions.clear();
+    m_tokenSelectedTotals = TokenTotals();
+    m_tokenSelectedContextWindow = 0;
+    m_tokenLastUpdated.clear();
+
+    const QDate today = QDate::currentDate();
+    bool todayLoaded = false;
+    const bool hourlySeries = m_tokenRangeStartDate == m_tokenRangeEndDate;
+    QString lastUpdatedIso;
+    for (QDate date = m_tokenRangeStartDate; date <= m_tokenRangeEndDate; date = date.addDays(1)) {
+        TokenTotals dayTotals;
+        qint64 contextWindow = 0;
+        QString dayLastUpdated;
+        const QVector<TokenSession> sessions = readTokenSessionsForDate(date, &dayTotals, &contextWindow, &dayLastUpdated);
+
+        if (hourlySeries) {
+            QVector<qint64> hourlyTokens(24);
+            QVector<int> hourlySessions(24);
+            for (const TokenSession &session : sessions) {
+                bool countedSession = false;
+                for (int hour = 0; hour < session.hourlyTokens.size() && hour < 24; ++hour) {
+                    if (session.hourlyTokens.at(hour) <= 0) {
+                        continue;
+                    }
+
+                    hourlyTokens[hour] += session.hourlyTokens.at(hour);
+                    ++hourlySessions[hour];
+                    countedSession = true;
+                }
+
+                if (!countedSession && session.totals.totalTokens > 0) {
+                    const QString timestamp = session.lastUpdatedAt.isEmpty() ? session.startedAt : session.lastUpdatedAt;
+                    const int hour = std::clamp(timestampHour(timestamp), 0, 23);
+                    hourlyTokens[hour] += session.totals.totalTokens;
+                    ++hourlySessions[hour];
+                }
+            }
+            for (int hour = 0; hour < 24; ++hour) {
+                m_tokenDailySeries.append({date, hourlyTokens[hour], hourlySessions[hour], hour});
+            }
+        } else {
+            m_tokenDailySeries.append({date, dayTotals.totalTokens, static_cast<int>(sessions.size())});
+        }
+        m_tokenSelectedTotals.inputTokens += dayTotals.inputTokens;
+        m_tokenSelectedTotals.cachedInputTokens += dayTotals.cachedInputTokens;
+        m_tokenSelectedTotals.outputTokens += dayTotals.outputTokens;
+        m_tokenSelectedTotals.reasoningOutputTokens += dayTotals.reasoningOutputTokens;
+        m_tokenSelectedTotals.totalTokens += dayTotals.totalTokens;
+        m_tokenSelectedContextWindow = std::max(m_tokenSelectedContextWindow, contextWindow);
+        if (!dayLastUpdated.isEmpty() && (lastUpdatedIso.isEmpty() || dayLastUpdated > lastUpdatedIso)) {
+            lastUpdatedIso = dayLastUpdated;
+        }
+        if (date == today) {
+            m_tokenTodayTotals = dayTotals;
+            m_tokenTodaySessionCount = sessions.size();
+            todayLoaded = true;
+        }
+        m_tokenSessions += sessions;
+    }
+
+    if (!todayLoaded) {
+        qint64 todayContextWindow = 0;
+        QString todayLastUpdated;
+        const QVector<TokenSession> todaySessions =
+            readTokenSessionsForDate(today, &m_tokenTodayTotals, &todayContextWindow, &todayLastUpdated);
+        m_tokenTodaySessionCount = static_cast<int>(todaySessions.size());
+    }
+
+    std::sort(m_tokenSessions.begin(), m_tokenSessions.end(), [](const TokenSession &left, const TokenSession &right) {
+        return left.startedAt > right.startedAt;
+    });
+
+    m_tokenLastUpdated = lastUpdatedIso.isEmpty() ? QString() : displayDateTime(lastUpdatedIso);
+
+    const QDir sessionsRoot = codexSessionsRootDir();
+    m_tokenSessionsPath = m_tokenRangeStartDate == m_tokenRangeEndDate
+                              ? sessionsRoot.filePath(m_tokenRangeStartDate.toString(QStringLiteral("yyyy/MM/dd")))
+                              : QStringLiteral("%1 - %2")
+                                    .arg(sessionsRoot.filePath(m_tokenRangeStartDate.toString(QStringLiteral("yyyy/MM/dd"))),
+                                         sessionsRoot.filePath(m_tokenRangeEndDate.toString(QStringLiteral("yyyy/MM/dd"))));
+    m_tokenUsageLoaded = true;
+
+    emit tokenUsageChanged();
+    emit dashboardChanged();
+}
+
+QVector<ProfileManager::TokenSession> ProfileManager::readTokenSessionsForDate(const QDate &date,
+                                                                                TokenTotals *totals,
+                                                                                qint64 *contextWindow,
+                                                                                QString *lastUpdated) const
+{
+    if (totals) {
+        *totals = TokenTotals();
+    }
+    if (contextWindow) {
+        *contextWindow = 0;
+    }
+    if (lastUpdated) {
+        lastUpdated->clear();
+    }
+
+    QVector<TokenSession> sessions;
+    if (!date.isValid()) {
+        return sessions;
+    }
+
+    const QDir dayDir(codexSessionsRootDir().filePath(date.toString(QStringLiteral("yyyy/MM/dd"))));
+    if (!dayDir.exists()) {
+        return sessions;
+    }
+
+    const QFileInfoList entries = dayDir.entryInfoList({QStringLiteral("*.jsonl")}, QDir::Files, QDir::Name);
+    sessions.reserve(entries.size());
+    for (const QFileInfo &entry : entries) {
+        TokenSession session;
+        if (!readTokenSessionFile(entry.absoluteFilePath(), &session)) {
+            continue;
+        }
+
+        if (totals) {
+            totals->inputTokens += session.totals.inputTokens;
+            totals->cachedInputTokens += session.totals.cachedInputTokens;
+            totals->outputTokens += session.totals.outputTokens;
+            totals->reasoningOutputTokens += session.totals.reasoningOutputTokens;
+            totals->totalTokens += session.totals.totalTokens;
+        }
+        if (contextWindow && session.contextWindow > *contextWindow) {
+            *contextWindow = session.contextWindow;
+        }
+        if (lastUpdated && !session.lastUpdatedAt.isEmpty()
+            && (lastUpdated->isEmpty() || session.lastUpdatedAt > *lastUpdated)) {
+            *lastUpdated = session.lastUpdatedAt;
+        }
+        sessions.append(session);
+    }
+
+    std::sort(sessions.begin(), sessions.end(), [](const TokenSession &left, const TokenSession &right) {
+        return left.startedAt > right.startedAt;
+    });
+
+    return sessions;
+}
+
+bool ProfileManager::readTokenSessionFile(const QString &path, TokenSession *session) const
+{
+    if (!session) {
+        return false;
+    }
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return false;
+    }
+
+    TokenSession result;
+    result.filePath = path;
+    result.fileName = QFileInfo(path).fileName();
+    result.hourlyTokens = QVector<qint64>(24);
+
+    bool hasTotals = false;
+    TokenTotals previousTotals;
+    QTextStream stream(&file);
+    while (!stream.atEnd()) {
+        const QByteArray line = stream.readLine().toUtf8();
+        if (line.trimmed().isEmpty()) {
+            continue;
+        }
+
+        QJsonParseError error;
+        const QJsonDocument document = QJsonDocument::fromJson(line, &error);
+        if (error.error != QJsonParseError::NoError || !document.isObject()) {
+            continue;
+        }
+
+        const QJsonObject object = document.object();
+        const QString type = object.value(QStringLiteral("type")).toString();
+        const QString timestamp = object.value(QStringLiteral("timestamp")).toString();
+
+        if (type == QStringLiteral("session_meta")) {
+            const QJsonObject payload = object.value(QStringLiteral("payload")).toObject();
+            result.id = payload.value(QStringLiteral("id")).toString();
+            result.cwd = payload.value(QStringLiteral("cwd")).toString();
+            result.originator = payload.value(QStringLiteral("originator")).toString();
+            result.source = payload.value(QStringLiteral("source")).toString();
+            result.modelProvider = payload.value(QStringLiteral("model_provider")).toString();
+            result.startedAt = payload.value(QStringLiteral("timestamp")).toString(timestamp);
+            continue;
+        }
+
+        if (type != QStringLiteral("event_msg")) {
+            continue;
+        }
+
+        const QJsonObject payload = object.value(QStringLiteral("payload")).toObject();
+        if (payload.value(QStringLiteral("type")).toString() == QStringLiteral("user_message")) {
+            ++result.turnCount;
+            continue;
+        }
+        if (payload.value(QStringLiteral("type")).toString() != QStringLiteral("token_count")) {
+            continue;
+        }
+
+        const QJsonObject info = payload.value(QStringLiteral("info")).toObject();
+        if (info.isEmpty()) {
+            continue;
+        }
+
+        const QJsonObject totalUsage = info.value(QStringLiteral("total_token_usage")).toObject();
+        if (totalUsage.isEmpty()) {
+            continue;
+        }
+
+        const TokenTotals currentTotals = readTokenTotals(totalUsage);
+        const int hour = std::clamp(timestampHour(timestamp), 0, 23);
+        const qint64 tokenDelta = hasTotals
+                                      ? std::max<qint64>(0, currentTotals.totalTokens - previousTotals.totalTokens)
+                                      : currentTotals.totalTokens;
+        result.hourlyTokens[hour] += tokenDelta;
+        result.totals = currentTotals;
+        result.contextWindow = jsonInteger(info, QStringLiteral("model_context_window"));
+        previousTotals = currentTotals;
+
+        const QJsonObject rateLimits = payload.value(QStringLiteral("rate_limits")).toObject();
+        result.limitId = rateLimits.value(QStringLiteral("limit_id")).toString();
+        result.planType = rateLimits.value(QStringLiteral("plan_type")).toString();
+        result.lastUpdatedAt = timestamp;
+        hasTotals = true;
+    }
+
+    if (!hasTotals) {
+        return false;
+    }
+
+    if (result.startedAt.isEmpty()) {
+        result.startedAt = result.lastUpdatedAt;
+    }
+    if (result.id.isEmpty()) {
+        result.id = result.fileName;
+    }
+
+    *session = result;
+    return true;
+}
+
+QVariantMap ProfileManager::tokenDayToMap(const TokenDay &day) const
+{
+    QVariantMap map;
+    if (day.hour >= 0) {
+        map.insert(QStringLiteral("date"),
+                   QStringLiteral("%1 %2:00").arg(day.date.toString(QStringLiteral("yyyy-MM-dd")),
+                                                   QStringLiteral("%1").arg(day.hour, 2, 10, QLatin1Char('0'))));
+        map.insert(QStringLiteral("label"), QStringLiteral("%1:00").arg(day.hour, 2, 10, QLatin1Char('0')));
+    } else {
+        map.insert(QStringLiteral("date"), day.date.toString(QStringLiteral("yyyy-MM-dd")));
+        map.insert(QStringLiteral("label"), day.date.toString(QStringLiteral("MM-dd")));
+    }
+    map.insert(QStringLiteral("tokens"), day.totalTokens);
+    map.insert(QStringLiteral("sessions"), day.sessionCount);
+    return map;
+}
+
+ProfileManager::TokenTotals ProfileManager::readTokenTotals(const QJsonObject &object) const
+{
+    TokenTotals totals;
+    totals.inputTokens = jsonInteger(object, QStringLiteral("input_tokens"));
+    totals.cachedInputTokens = jsonInteger(object, QStringLiteral("cached_input_tokens"));
+    totals.outputTokens = jsonInteger(object, QStringLiteral("output_tokens"));
+    totals.reasoningOutputTokens = jsonInteger(object, QStringLiteral("reasoning_output_tokens"));
+    totals.totalTokens = jsonInteger(object, QStringLiteral("total_tokens"));
+    return totals;
+}
+
+QVariantMap ProfileManager::tokenSessionToMap(const TokenSession &session) const
+{
+    QVariantMap map = tokenTotalsToMap(session.totals);
+    map.insert(QStringLiteral("id"), session.id);
+    map.insert(QStringLiteral("fileName"), session.fileName);
+    map.insert(QStringLiteral("filePath"), session.filePath);
+    map.insert(QStringLiteral("cwd"), session.cwd.isEmpty() ? QStringLiteral("-") : session.cwd);
+    map.insert(QStringLiteral("originator"), session.originator.isEmpty() ? QStringLiteral("-") : session.originator);
+    map.insert(QStringLiteral("source"), session.source.isEmpty() ? QStringLiteral("-") : session.source);
+    map.insert(QStringLiteral("modelProvider"), session.modelProvider.isEmpty() ? QStringLiteral("-") : session.modelProvider);
+    map.insert(QStringLiteral("startedAt"), displayDateTime(session.startedAt));
+    map.insert(QStringLiteral("lastUpdatedAt"), displayDateTime(session.lastUpdatedAt));
+    map.insert(QStringLiteral("limitId"), session.limitId.isEmpty() ? QStringLiteral("-") : session.limitId);
+    map.insert(QStringLiteral("planType"), session.planType.isEmpty() ? QStringLiteral("-") : session.planType);
+    map.insert(QStringLiteral("turnCount"), session.turnCount);
+    map.insert(QStringLiteral("contextWindow"), session.contextWindow);
+    return map;
+}
+
+QVariantMap ProfileManager::tokenTotalsToMap(const TokenTotals &totals) const
+{
+    QVariantMap map;
+    map.insert(QStringLiteral("inputTokens"), totals.inputTokens);
+    map.insert(QStringLiteral("cachedInputTokens"), totals.cachedInputTokens);
+    map.insert(QStringLiteral("outputTokens"), totals.outputTokens);
+    map.insert(QStringLiteral("reasoningOutputTokens"), totals.reasoningOutputTokens);
+    map.insert(QStringLiteral("totalTokens"), totals.totalTokens);
+    return map;
 }
 
 ProfileManager::Profile *ProfileManager::selectedProfile()

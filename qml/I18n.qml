@@ -95,6 +95,21 @@ QtObject {
             return arg(t("Across %1 profiles"), match[1])
         }
 
+        match = String(message).match(/^Across (\d+) sessions$/)
+        if (match) {
+            return arg(t("Across %1 sessions"), match[1])
+        }
+
+        match = String(message).match(/^Token usage loaded for (.*)$/)
+        if (match) {
+            return arg(t("Token usage loaded for %1"), match[1])
+        }
+
+        match = String(message).match(/^(\d+) days$/)
+        if (match) {
+            return arg(t("%1 days"), match[1])
+        }
+
         match = String(message).match(/^Settings loaded from (.*)$/)
         if (match) {
             return arg(t("Settings loaded from %1"), match[1])
@@ -132,6 +147,46 @@ QtObject {
         "Tracked Profiles": "已跟踪配置",
         "Health": "健康",
         "%1 active": "%1 已启用",
+        "Total Tokens": "总 Token",
+        "Input Tokens": "输入 Token",
+        "Output Tokens": "输出 Token",
+        "Context Window": "上下文窗口",
+        "Range Usage": "区间总用量",
+        "%1 sessions": "%1 个会话",
+        "%1 cached": "%1 缓存",
+        "%1 reasoning": "%1 推理",
+        "Daily Flow": "每日流量",
+        "Hourly Flow": "小时流量",
+        "Cached": "缓存",
+        "Reasoning": "推理",
+        "Updated": "更新",
+        "Date Range": "时间区间",
+        "Start Date": "开始日期",
+        "End Date": "结束日期",
+        "Last 7 Days": "近一周",
+        "Last 30 Days": "近一个月",
+        "Year": "年份",
+        "Month": "月份",
+        "Confirm": "确认",
+        "Previous Year": "上一年",
+        "Next Year": "下一年",
+        "Previous Month": "上个月",
+        "Next Month": "下个月",
+        "Sun": "日",
+        "Mon": "一",
+        "Tue": "二",
+        "Wed": "三",
+        "Thu": "四",
+        "Fri": "五",
+        "Sat": "六",
+        "%1 days": "%1 天",
+        "Refresh": "刷新",
+        "Today": "今天",
+        "Yesterday": "昨天",
+        "Tomorrow": "明天",
+        "Token usage refreshed": "Token 用量已刷新",
+        "Token usage loaded for %1": "已加载 %1 的 Token 用量",
+        "Across %1 sessions": "跨 %1 个会话",
 
         "SOFTWARE": "软件",
         "Appearance": "外观",
