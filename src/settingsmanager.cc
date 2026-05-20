@@ -55,7 +55,12 @@ QString nonEmptyString(QString value, const QString &fallback)
 
 int boundedAccentIndex(int value)
 {
-    return std::clamp(value, 0, 2);
+    return std::clamp(value, 0, 5);
+}
+
+int boundedPort(int value)
+{
+    return std::clamp(value, 1024, 65535);
 }
 
 bool jsonBool(const QJsonObject &object, const QString &key, bool fallback)
@@ -80,7 +85,21 @@ QString jsonString(const QJsonObject &object, const QString &key, const QString 
 SettingsManager::SettingsManager(QObject *parent)
     : QObject(parent)
 {
+    m_persistTimer.setSingleShot(true);
+    m_persistTimer.setInterval(250);
+    connect(&m_persistTimer, &QTimer::timeout, this, [this] {
+        writeSettingsToDisk(false);
+    });
+
     loadFromDisk(false);
+}
+
+SettingsManager::~SettingsManager()
+{
+    if (m_persistTimer.isActive()) {
+        m_persistTimer.stop();
+        writeSettingsToDisk(false);
+    }
 }
 
 bool SettingsManager::darkTheme() const
@@ -185,6 +204,64 @@ void SettingsManager::setHealthCheckOnActivate(bool healthCheckOnActivate)
     emit healthCheckOnActivateChanged();
     emit valuesChanged();
     persistAfterChange();
+}
+
+bool SettingsManager::loomProxyEnabled() const
+{
+    return m_loomProxyEnabled;
+}
+
+void SettingsManager::setLoomProxyEnabled(bool loomProxyEnabled)
+{
+    const bool proxyChanged = m_loomProxyEnabled != loomProxyEnabled;
+    const bool routesChanged = m_codexRoutesThroughLoom != loomProxyEnabled;
+    if (!proxyChanged && !routesChanged) {
+        return;
+    }
+
+    m_loomProxyEnabled = loomProxyEnabled;
+    m_codexRoutesThroughLoom = loomProxyEnabled;
+    if (proxyChanged) {
+        emit loomProxyEnabledChanged();
+    }
+    if (routesChanged) {
+        emit codexRoutesThroughLoomChanged();
+    }
+    emit valuesChanged();
+    persistAfterChange();
+}
+
+int SettingsManager::loomProxyPort() const
+{
+    return m_loomProxyPort;
+}
+
+void SettingsManager::setLoomProxyPort(int loomProxyPort)
+{
+    const int nextPort = boundedPort(loomProxyPort);
+    if (m_loomProxyPort == nextPort) {
+        return;
+    }
+
+    m_loomProxyPort = nextPort;
+    emit loomProxyPortChanged();
+    emit valuesChanged();
+    persistAfterChange();
+}
+
+QString SettingsManager::loomProxyUrl() const
+{
+    return QStringLiteral("http://127.0.0.1:%1/v1").arg(m_loomProxyPort);
+}
+
+bool SettingsManager::codexRoutesThroughLoom() const
+{
+    return m_codexRoutesThroughLoom;
+}
+
+void SettingsManager::setCodexRoutesThroughLoom(bool codexRoutesThroughLoom)
+{
+    setLoomProxyEnabled(codexRoutesThroughLoom);
 }
 
 QString SettingsManager::language() const
@@ -442,6 +519,9 @@ void SettingsManager::emitAllChanged()
     emit launchAtLoginChanged();
     emit restoreLastSectionChanged();
     emit healthCheckOnActivateChanged();
+    emit loomProxyEnabledChanged();
+    emit loomProxyPortChanged();
+    emit codexRoutesThroughLoomChanged();
     emit languageChanged();
     emit maskSecretsChanged();
     emit keepBackupsChanged();
@@ -502,6 +582,10 @@ bool SettingsManager::loadFromDisk(bool announce)
     m_launchAtLogin = jsonBool(behavior, QStringLiteral("launchAtLogin"), m_launchAtLogin);
     m_restoreLastSection = jsonBool(behavior, QStringLiteral("restoreLastSection"), m_restoreLastSection);
     m_healthCheckOnActivate = jsonBool(behavior, QStringLiteral("healthCheckOnActivate"), m_healthCheckOnActivate);
+    const QJsonObject proxy = root.value(QStringLiteral("proxy")).toObject();
+    m_loomProxyEnabled = jsonBool(proxy, QStringLiteral("enabled"), m_loomProxyEnabled);
+    m_loomProxyPort = boundedPort(jsonInt(proxy, QStringLiteral("port"), m_loomProxyPort));
+    m_codexRoutesThroughLoom = m_loomProxyEnabled;
     m_lastSection = validatedChoice(jsonString(behavior, QStringLiteral("lastSection"), m_lastSection), sections(), QStringLiteral("Dashboard"));
 
     m_selectedProfileFolder = jsonString(profiles, QStringLiteral("selectedProfileFolder"), m_selectedProfileFolder).trimmed();
@@ -538,7 +622,7 @@ bool SettingsManager::loadFromDisk(bool announce)
 void SettingsManager::persistAfterChange()
 {
     if (!m_loading) {
-        writeSettingsToDisk(false);
+        m_persistTimer.start();
     }
 }
 
@@ -566,6 +650,12 @@ QJsonObject SettingsManager::toJsonObject(bool includeUpdatedAt) const
     behavior.insert(QStringLiteral("healthCheckOnActivate"), m_healthCheckOnActivate);
     behavior.insert(QStringLiteral("confirmProfileDeletion"), confirmProfileDeletion());
     behavior.insert(QStringLiteral("lastSection"), m_lastSection);
+
+    QJsonObject proxy;
+    proxy.insert(QStringLiteral("enabled"), m_loomProxyEnabled);
+    proxy.insert(QStringLiteral("port"), m_loomProxyPort);
+    proxy.insert(QStringLiteral("url"), loomProxyUrl());
+    proxy.insert(QStringLiteral("codexRoutesThroughLoom"), m_codexRoutesThroughLoom);
 
     QJsonObject profiles;
     profiles.insert(QStringLiteral("selectedProfileFolder"), m_selectedProfileFolder);
@@ -598,6 +688,7 @@ QJsonObject SettingsManager::toJsonObject(bool includeUpdatedAt) const
     }
     root.insert(QStringLiteral("appearance"), appearance);
     root.insert(QStringLiteral("behavior"), behavior);
+    root.insert(QStringLiteral("proxy"), proxy);
     root.insert(QStringLiteral("profiles"), profiles);
     root.insert(QStringLiteral("interfaceConfig"), interfaceConfig);
     root.insert(QStringLiteral("storage"), storage);
@@ -606,6 +697,10 @@ QJsonObject SettingsManager::toJsonObject(bool includeUpdatedAt) const
 
 bool SettingsManager::writeSettingsToDisk(bool announce)
 {
+    if (announce && m_persistTimer.isActive()) {
+        m_persistTimer.stop();
+    }
+
     if (!ensureSettingsRoot()) {
         return false;
     }

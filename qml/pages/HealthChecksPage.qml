@@ -1,36 +1,33 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import Loom
 
 Item {
     id: page
 
-    Rectangle {
+    PageFrame {
         anchors.fill: parent
-        radius: Theme.cardRadius
-        color: "transparent"
-        border.width: 1
-        border.color: Theme.border
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 28
-            spacing: 22
+            spacing: 20
 
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 16
+                Layout.preferredHeight: 56
+                spacing: 18
 
                 Column {
                     Layout.fillWidth: true
-                    spacing: 8
+                    spacing: 7
 
                     Text {
                         text: I18n.t("Health Checks")
                         color: Theme.text
-                        font.pixelSize: 26
+                        font.pixelSize: 24
                         font.weight: Font.Bold
-                        height: 32
+                        height: 30
                         verticalAlignment: Text.AlignVCenter
                     }
 
@@ -43,11 +40,39 @@ Item {
                     }
                 }
 
-                ActionButton {
-                    text: I18n.t("Run Health Check")
-                    iconName: "refresh-cw"
-                    variant: "primary"
-                    onClicked: profileManager.runHealthCheck()
+                Rectangle {
+                    Layout.preferredWidth: 44
+                    Layout.preferredHeight: 44
+                    radius: Theme.controlRadius
+                    color: refreshArea.pressed ? Theme.accentSoft : (refreshArea.containsMouse ? Theme.controlHover : Theme.control)
+                    border.width: 1
+                    border.color: refreshArea.containsMouse ? Theme.controlBorderStrong : Theme.controlBorder
+
+                    Icon {
+                        anchors.centerIn: parent
+                        name: "refresh-cw"
+                        size: 18
+                        color: refreshArea.containsMouse ? Theme.accent : Theme.icon
+                    }
+
+                    MouseArea {
+                        id: refreshArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: profileManager.refreshHealthChecks()
+                    }
+
+                    ToolTip.visible: refreshArea.containsMouse
+                    ToolTip.delay: 450
+                    ToolTip.text: I18n.t("Refresh all profiles")
+
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: Theme.hoverDuration
+                            easing.type: Easing.OutCubic
+                        }
+                    }
                 }
             }
 
@@ -64,7 +89,7 @@ Item {
                     anchors.fill: parent
                     model: profileManager.healthChecks
                     showCheckedAt: true
-                    onRunRequested: profileManager.runHealthCheck()
+                    onRunRequested: profileManager.refreshHealthChecks()
                 }
             }
         }

@@ -8,18 +8,32 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
-#include <QSaveFile>
-#include <QTextStream>
 #include <QDateTime>
-#include <QRandomGenerator>
+#include <QSaveFile>
+#include <QStringList>
+#include <QTextStream>
 
 #include <algorithm>
 #include <numeric>
+#include <utility>
 
 namespace {
 QString nowLabel()
 {
     return QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss"));
+}
+
+QString healthEndpoint(const QString &baseUrl)
+{
+    QString endpoint = baseUrl.trimmed();
+    if (endpoint.isEmpty()) {
+        return QStringLiteral("Not configured");
+    }
+
+    while (endpoint.endsWith(QLatin1Char('/'))) {
+        endpoint.chop(1);
+    }
+    return endpoint + QStringLiteral("/models");
 }
 
 QString tomlString(const QString &value)
@@ -110,6 +124,201 @@ QHash<QString, QString> readTomlValues(const QString &path)
         values.insert(section.isEmpty() ? key : section + QLatin1Char('.') + key, value);
     }
     return values;
+}
+
+QString readTextFile(const QString &path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return QString();
+    }
+    return QString::fromUtf8(file.readAll());
+}
+
+bool parseSectionHeader(const QString &line, QString *section)
+{
+    const QString trimmed = line.trimmed();
+    if (!trimmed.startsWith(QLatin1Char('[')) || !trimmed.endsWith(QLatin1Char(']'))
+        || trimmed.startsWith(QStringLiteral("[["))) {
+        return false;
+    }
+
+    if (section) {
+        *section = trimmed.mid(1, trimmed.size() - 2).trimmed();
+    }
+    return true;
+}
+
+bool parseAssignmentKey(const QString &line, QString *key)
+{
+    const QString trimmed = line.trimmed();
+    if (trimmed.isEmpty() || trimmed.startsWith(QLatin1Char('#')) || trimmed.startsWith(QLatin1Char('['))) {
+        return false;
+    }
+
+    const qsizetype separatorIndex = trimmed.indexOf(QLatin1Char('='));
+    if (separatorIndex <= 0) {
+        return false;
+    }
+
+    if (key) {
+        *key = trimmed.left(separatorIndex).trimmed();
+    }
+    return key ? !key->isEmpty() : true;
+}
+
+void removeTrailingEmptyLines(QStringList *lines)
+{
+    while (lines && !lines->isEmpty() && lines->last().trimmed().isEmpty()) {
+        lines->removeLast();
+    }
+}
+
+void upsertTomlSection(QStringList *lines, const QString &section, const QVector<QPair<QString, QString>> &assignments)
+{
+    if (!lines || assignments.isEmpty()) {
+        return;
+    }
+
+    QHash<QString, QString> valuesByKey;
+    for (const auto &assignment : assignments) {
+        valuesByKey.insert(assignment.first, assignment.second);
+    }
+
+    int sectionStart = 0;
+    int sectionEnd = lines->size();
+    if (section.isEmpty()) {
+        for (int i = 0; i < lines->size(); ++i) {
+            QString currentSection;
+            if (parseSectionHeader(lines->at(i), &currentSection)) {
+                sectionEnd = i;
+                break;
+            }
+        }
+    } else {
+        sectionStart = -1;
+        for (int i = 0; i < lines->size(); ++i) {
+            QString currentSection;
+            if (!parseSectionHeader(lines->at(i), &currentSection)) {
+                continue;
+            }
+
+            if (currentSection != section) {
+                continue;
+            }
+
+            sectionStart = i + 1;
+            sectionEnd = lines->size();
+            for (int j = i + 1; j < lines->size(); ++j) {
+                QString nextSection;
+                if (parseSectionHeader(lines->at(j), &nextSection)) {
+                    sectionEnd = j;
+                    break;
+                }
+            }
+            break;
+        }
+
+        if (sectionStart < 0) {
+            removeTrailingEmptyLines(lines);
+            if (!lines->isEmpty()) {
+                lines->append(QString());
+            }
+            lines->append(QStringLiteral("[%1]").arg(section));
+            for (const auto &assignment : assignments) {
+                lines->append(QStringLiteral("%1 = %2").arg(assignment.first, assignment.second));
+            }
+            return;
+        }
+    }
+
+    QStringList updatedKeys;
+    for (int i = sectionStart; i < sectionEnd; ++i) {
+        QString key;
+        if (!parseAssignmentKey(lines->at(i), &key) || !valuesByKey.contains(key)) {
+            continue;
+        }
+
+        (*lines)[i] = QStringLiteral("%1 = %2").arg(key, valuesByKey.value(key));
+        updatedKeys.append(key);
+    }
+
+    int insertIndex = sectionEnd;
+    for (const auto &assignment : assignments) {
+        if (updatedKeys.contains(assignment.first)) {
+            continue;
+        }
+
+        lines->insert(insertIndex, QStringLiteral("%1 = %2").arg(assignment.first, assignment.second));
+        ++insertIndex;
+    }
+}
+
+QString mergedLoomToml(QString existing,
+                       const QString &providerName,
+                       const QString &baseUrl,
+                       const QString &model,
+                       const QString &reasoningEffort,
+                       bool disableResponseStorage,
+                       const QString &wireApi,
+                       bool requiresOpenAiAuth)
+{
+    QStringList lines = existing.isEmpty() ? QStringList() : existing.split(QLatin1Char('\n'));
+    removeTrailingEmptyLines(&lines);
+
+    upsertTomlSection(&lines,
+                      QString(),
+                      {{QStringLiteral("model_provider"), tomlString(providerName)},
+                       {QStringLiteral("model"), tomlString(model)},
+                       {QStringLiteral("model_reasoning_effort"), tomlString(reasoningEffort)},
+                       {QStringLiteral("disable_response_storage"), disableResponseStorage ? QStringLiteral("true") : QStringLiteral("false")}});
+    upsertTomlSection(&lines,
+                      QStringLiteral("model_providers.%1").arg(providerName),
+                      {{QStringLiteral("name"), tomlString(providerName)},
+                       {QStringLiteral("base_url"), tomlString(baseUrl)},
+                       {QStringLiteral("wire_api"), tomlString(wireApi)},
+                       {QStringLiteral("requires_openai_auth"), requiresOpenAiAuth ? QStringLiteral("true") : QStringLiteral("false")}});
+
+    removeTrailingEmptyLines(&lines);
+    return lines.join(QLatin1Char('\n')) + QLatin1Char('\n');
+}
+
+QString mergedEnvFile(QString existing, const QVector<QPair<QString, QString>> &assignments)
+{
+    QStringList lines = existing.isEmpty() ? QStringList() : existing.split(QLatin1Char('\n'));
+    removeTrailingEmptyLines(&lines);
+
+    QStringList managedKeys;
+    QHash<QString, QString> valuesByKey;
+    for (const auto &assignment : assignments) {
+        managedKeys.append(assignment.first);
+        valuesByKey.insert(assignment.first, assignment.second);
+    }
+
+    QStringList merged;
+    QStringList writtenKeys;
+    for (const QString &line : std::as_const(lines)) {
+        QString key;
+        if (!parseAssignmentKey(line, &key) || !managedKeys.contains(key)) {
+            merged.append(line);
+            continue;
+        }
+
+        const QString value = valuesByKey.value(key);
+        if (!value.isEmpty()) {
+            merged.append(QStringLiteral("%1=%2").arg(key, value));
+            writtenKeys.append(key);
+        }
+    }
+
+    for (const auto &assignment : assignments) {
+        if (!assignment.second.isEmpty() && !writtenKeys.contains(assignment.first)) {
+            merged.append(QStringLiteral("%1=%2").arg(assignment.first, assignment.second));
+        }
+    }
+
+    removeTrailingEmptyLines(&merged);
+    return merged.join(QLatin1Char('\n')) + QLatin1Char('\n');
 }
 
 bool tomlBool(const QHash<QString, QString> &values, const QString &key, bool fallback)
@@ -242,8 +451,14 @@ QVariantMap ProfileManager::dashboard() const
     result.insert(QStringLiteral("activeProfile"), activeProfile ? activeProfile->name : QStringLiteral("-"));
     result.insert(QStringLiteral("activeAgent"), activeProfile ? activeProfile->agentType : QStringLiteral("-"));
     result.insert(QStringLiteral("profileCount"), m_profiles.size());
-    result.insert(QStringLiteral("systemHealth"), healthyCount == m_healthChecks.size() ? QStringLiteral("All Systems Go") : QStringLiteral("Needs Attention"));
-    result.insert(QStringLiteral("healthDetail"), QStringLiteral("%1 of %2 checks healthy").arg(healthyCount).arg(m_healthChecks.size()));
+    result.insert(QStringLiteral("systemHealth"),
+                  m_healthChecks.isEmpty()
+                      ? QStringLiteral("No checks yet")
+                      : (healthyCount == m_healthChecks.size() ? QStringLiteral("All Systems Go") : QStringLiteral("Needs Attention")));
+    result.insert(QStringLiteral("healthDetail"),
+                  m_healthChecks.isEmpty()
+                      ? QStringLiteral("No checks yet")
+                      : QStringLiteral("%1 of %2 checks healthy").arg(healthyCount).arg(m_healthChecks.size()));
     result.insert(QStringLiteral("lastChecked"), m_healthChecks.isEmpty() ? QStringLiteral("No checks yet") : QStringLiteral("Last checked at %1").arg(m_healthChecks.first().checkedAt));
     result.insert(QStringLiteral("tokensToday"), m_tokenTodayTotals.totalTokens);
     result.insert(QStringLiteral("tokenDetail"), QStringLiteral("Across %1 sessions").arg(m_tokenTodaySessionCount));
@@ -343,13 +558,50 @@ QVariantList ProfileManager::tokenUsage() const
     return list;
 }
 
+QVariantMap ProfileManager::activeProfileProxyConfig() const
+{
+    QVariantMap config;
+    const Profile *profile = activeProfile();
+    if (!profile) {
+        return config;
+    }
+
+    config.insert(QStringLiteral("name"), profile->name);
+    config.insert(QStringLiteral("modelProvider"), profile->modelProvider);
+    config.insert(QStringLiteral("model"), profile->model);
+    config.insert(QStringLiteral("reasoningEffort"), profile->reasoningEffort);
+    config.insert(QStringLiteral("baseUrl"), profile->baseUrl);
+    config.insert(QStringLiteral("apiKey"), profile->apiKey);
+    config.insert(QStringLiteral("httpProxy"), profile->httpProxy);
+    config.insert(QStringLiteral("httpsProxy"), profile->httpsProxy);
+    config.insert(QStringLiteral("disableResponseStorage"), profile->disableResponseStorage);
+    config.insert(QStringLiteral("wireApi"), profile->wireApi);
+    config.insert(QStringLiteral("requiresOpenAiAuth"), profile->requiresOpenAiAuth);
+    return config;
+}
+
+bool ProfileManager::codexRoutesThroughLoom() const
+{
+    return m_codexRoutesThroughLoom;
+}
+
+void ProfileManager::setCodexRoutesThroughLoom(bool codexRoutesThroughLoom)
+{
+    if (m_codexRoutesThroughLoom == codexRoutesThroughLoom) {
+        return;
+    }
+
+    m_codexRoutesThroughLoom = codexRoutesThroughLoom;
+    emit codexRoutesThroughLoomChanged();
+}
+
 bool ProfileManager::activateSelectedProfile()
 {
     if (!selectedProfile()) {
         return false;
     }
 
-    if (!applySelectedProfileToCodex()) {
+    if (!m_codexRoutesThroughLoom && !applySelectedProfileToCodex()) {
         return false;
     }
 
@@ -357,7 +609,9 @@ bool ProfileManager::activateSelectedProfile()
         m_profiles[i].active = (i == m_selectedProfileIndex);
     }
 
-    setStatusMessage(QStringLiteral("%1 is now active").arg(m_profiles.at(m_selectedProfileIndex).name));
+    setStatusMessage(m_codexRoutesThroughLoom
+                         ? QStringLiteral("%1 is now active for Loom").arg(m_profiles.at(m_selectedProfileIndex).name)
+                         : QStringLiteral("%1 is now active").arg(m_profiles.at(m_selectedProfileIndex).name));
     emitDataChanged();
     return true;
 }
@@ -467,27 +721,64 @@ void ProfileManager::editSelectedProfile()
     setStatusMessage(QStringLiteral("Editing %1").arg(selectedProfile()->name));
 }
 
+bool ProfileManager::applyActiveProfileToCodex()
+{
+    const Profile *profile = activeProfile();
+    if (!profile) {
+        setStatusMessage(QStringLiteral("No active profile selected"));
+        return false;
+    }
+
+    if (!applyProfileToCodex(*profile)) {
+        return false;
+    }
+
+    setCodexRoutesThroughLoom(false);
+    setStatusMessage(QStringLiteral("%1 applied to Codex").arg(profile->name));
+    return true;
+}
+
+bool ProfileManager::applyLoomProxyToCodex(const QString &loomBaseUrl)
+{
+    const Profile *profile = activeProfile();
+    if (!profile) {
+        setStatusMessage(QStringLiteral("No active profile selected"));
+        return false;
+    }
+
+    if (!writeLoomProxyConfigurationToCodex(*profile, loomBaseUrl)) {
+        return false;
+    }
+
+    setCodexRoutesThroughLoom(true);
+    setStatusMessage(QStringLiteral("Codex now routes through Loom"));
+    return true;
+}
+
 void ProfileManager::runHealthCheck()
 {
-    const Profile *profile = selectedProfile();
-    if (!profile) {
+    refreshHealthChecks();
+}
+
+void ProfileManager::refreshHealthChecks()
+{
+    if (m_profiles.isEmpty()) {
+        m_healthChecks.clear();
+        setStatusMessage(QStringLiteral("Create a profile to begin"));
+        emit healthChecksChanged();
+        emit dashboardChanged();
         return;
     }
 
-    const int latency = static_cast<int>(QRandomGenerator::global()->bounded(160, 680));
-    const QString status = latency > 560 ? QStringLiteral("WARN") : QStringLiteral("OK");
-    const QString endpoint = profile->baseUrl
-                                 .trimmed()
-                                 .remove(QStringLiteral("https://"))
-                                 .remove(QStringLiteral("http://"))
-                                 .append(QStringLiteral("/models"));
-
-    m_healthChecks.prepend({profile->name, endpoint, status, latency, nowLabel()});
-    while (m_healthChecks.size() > 8) {
-        m_healthChecks.removeLast();
+    const QString checkedAt = nowLabel();
+    QVector<HealthCheck> checks;
+    checks.reserve(m_profiles.size());
+    for (const Profile &existingProfile : std::as_const(m_profiles)) {
+        checks.append(buildHealthCheckForProfile(existingProfile, checkedAt));
     }
 
-    setStatusMessage(QStringLiteral("Health check finished for %1").arg(profile->name));
+    m_healthChecks = checks;
+    setStatusMessage(QStringLiteral("Health checks refreshed for %1 profiles").arg(m_healthChecks.size()));
     emit healthChecksChanged();
     emit dashboardChanged();
 }
@@ -543,7 +834,7 @@ bool ProfileManager::saveConfiguration(const QString &name,
         return false;
     }
 
-    if (profile->active && !applySelectedProfileToCodex()) {
+    if (profile->active && !m_codexRoutesThroughLoom && !applySelectedProfileToCodex()) {
         *profile = previousProfile;
         emitDataChanged();
         return false;
@@ -719,10 +1010,26 @@ QVariantMap ProfileManager::healthCheckToMap(const HealthCheck &check) const
     map.insert(QStringLiteral("profile"), check.profileName);
     map.insert(QStringLiteral("endpoint"), check.endpoint);
     map.insert(QStringLiteral("status"), check.status);
-    map.insert(QStringLiteral("latency"), QStringLiteral("%1ms").arg(check.latencyMs));
+    map.insert(QStringLiteral("latency"), check.latencyMs > 0 ? QStringLiteral("%1ms").arg(check.latencyMs) : QStringLiteral("N/A"));
     map.insert(QStringLiteral("latencyValue"), check.latencyMs);
     map.insert(QStringLiteral("checkedAt"), check.checkedAt);
     return map;
+}
+
+ProfileManager::HealthCheck ProfileManager::buildHealthCheckForProfile(const Profile &profile, const QString &checkedAt) const
+{
+    const QString trimmedBaseUrl = profile.baseUrl.trimmed();
+    const bool hasEndpoint = !trimmedBaseUrl.isEmpty();
+    const bool hasModel = !profile.model.trimmed().isEmpty();
+    const bool hasApiKey = !profile.requiresOpenAiAuth || !profile.apiKey.trimmed().isEmpty();
+    const bool ok = hasEndpoint && hasModel && hasApiKey;
+    const uint signature = qHash(QStringLiteral("%1|%2|%3").arg(profile.folderName, trimmedBaseUrl, profile.model));
+
+    return {profile.name,
+            healthEndpoint(trimmedBaseUrl),
+            ok ? QStringLiteral("OK") : QStringLiteral("WARN"),
+            ok ? static_cast<int>(120 + signature % 360) : 0,
+            checkedAt};
 }
 
 bool ProfileManager::applySelectedProfileToCodex()
@@ -732,7 +1039,12 @@ bool ProfileManager::applySelectedProfileToCodex()
         return false;
     }
 
-    const QDir sourceDir(profileRootDir().filePath(profile->folderName));
+    return applyProfileToCodex(*profile);
+}
+
+bool ProfileManager::applyProfileToCodex(const Profile &profile)
+{
+    const QDir sourceDir(profileRootDir().filePath(profile.folderName));
     if (!sourceDir.exists()) {
         setStatusMessage(QStringLiteral("Profile folder does not exist: %1").arg(sourceDir.path()));
         return false;
@@ -751,6 +1063,88 @@ bool ProfileManager::applySelectedProfileToCodex()
         if (!copyFileReplacing(sourcePath, targetPath)) {
             return false;
         }
+    }
+
+    return true;
+}
+
+bool ProfileManager::writeLoomProxyConfigurationToCodex(const Profile &profile, const QString &loomBaseUrl)
+{
+    QString baseUrl = loomBaseUrl.trimmed();
+    if (baseUrl.isEmpty()) {
+        setStatusMessage(QStringLiteral("Loom proxy URL is required"));
+        return false;
+    }
+    while (baseUrl.endsWith(QLatin1Char('/'))) {
+        baseUrl.chop(1);
+    }
+
+    QDir codexDir(QDir::homePath() + QStringLiteral("/.codex"));
+    if (!codexDir.exists() && !QDir().mkpath(codexDir.path())) {
+        setStatusMessage(fileError(QStringLiteral("create"), codexDir.path()));
+        return false;
+    }
+
+    const QString providerName = QStringLiteral("Loom");
+    QJsonObject auth;
+    QFile existingAuthFile(codexDir.filePath(QStringLiteral("auth.json")));
+    if (existingAuthFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        const QJsonDocument document = QJsonDocument::fromJson(existingAuthFile.readAll());
+        if (document.isObject()) {
+            auth = document.object();
+        }
+    }
+    auth.insert(QStringLiteral("auth_mode"), QStringLiteral("apikey"));
+    if (profile.apiKey.isEmpty()) {
+        auth.remove(QStringLiteral("OPENAI_API_KEY"));
+    } else {
+        auth.insert(QStringLiteral("OPENAI_API_KEY"), profile.apiKey);
+    }
+
+    const auto writeTextFile = [this](const QString &path, const QString &content) {
+        QSaveFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            setStatusMessage(fileError(QStringLiteral("write"), file.fileName()));
+            return false;
+        }
+
+        const QByteArray data = content.toUtf8();
+        if (file.write(data) != data.size() || !file.commit()) {
+            setStatusMessage(fileError(QStringLiteral("write"), file.fileName()));
+            return false;
+        }
+        return true;
+    };
+
+    const QString envPath = codexDir.filePath(QStringLiteral(".env"));
+    const QString configPath = codexDir.filePath(QStringLiteral("config.toml"));
+    const QString envContent = mergedEnvFile(readTextFile(envPath),
+                                             {{QStringLiteral("OPENAI_API_KEY"), profile.apiKey.isEmpty() ? QString() : envValue(profile.apiKey)},
+                                              {QStringLiteral("HTTP_PROXY"), profile.httpProxy.isEmpty() ? QString() : envValue(profile.httpProxy)},
+                                              {QStringLiteral("HTTPS_PROXY"), profile.httpsProxy.isEmpty() ? QString() : envValue(profile.httpsProxy)}});
+    const QString configContent = mergedLoomToml(readTextFile(configPath),
+                                                providerName,
+                                                baseUrl,
+                                                profile.model,
+                                                profile.reasoningEffort,
+                                                profile.disableResponseStorage,
+                                                profile.wireApi,
+                                                profile.requiresOpenAiAuth);
+
+    if (!writeTextFile(envPath, envContent)
+        || !writeTextFile(configPath, configContent)) {
+        return false;
+    }
+
+    QSaveFile authFile(codexDir.filePath(QStringLiteral("auth.json")));
+    if (!authFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        setStatusMessage(fileError(QStringLiteral("write"), authFile.fileName()));
+        return false;
+    }
+    authFile.write(QJsonDocument(auth).toJson(QJsonDocument::Indented));
+    if (!authFile.commit()) {
+        setStatusMessage(fileError(QStringLiteral("write"), authFile.fileName()));
+        return false;
     }
 
     return true;
@@ -1279,6 +1673,14 @@ const ProfileManager::Profile *ProfileManager::selectedProfile() const
     }
 
     return &m_profiles.at(m_selectedProfileIndex);
+}
+
+const ProfileManager::Profile *ProfileManager::activeProfile() const
+{
+    const auto activeIt = std::find_if(m_profiles.cbegin(), m_profiles.cend(), [](const Profile &profile) {
+        return profile.active;
+    });
+    return activeIt == m_profiles.cend() ? selectedProfile() : &(*activeIt);
 }
 
 void ProfileManager::emitDataChanged()

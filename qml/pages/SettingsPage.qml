@@ -10,14 +10,14 @@ Item {
     property string settingsMessage: ""
 
     readonly property int navWidth: 248
-    readonly property int maxContentWidth: 980
     readonly property var themes: ["Dark", "Light"]
     readonly property var densities: ["Comfortable", "Compact"]
     readonly property var backupWindows: ["7 days", "14 days", "30 days"]
     readonly property var languages: ["en", "zh"]
     readonly property var languageNames: ["English", "Chinese"]
-    readonly property var accentColors: [Theme.accentBlue, Theme.accentGreen, Theme.accentAmber]
-    readonly property var accentNames: ["Blue", "Green", "Amber"]
+    readonly property var accentColors: [Theme.accentBlue, Theme.accentGreen, Theme.accentAmber, Theme.accentSky, Theme.accentMint, Theme.accentPeach]
+    readonly property var accentNames: ["Blue", "Green", "Amber", "Sky", "Mint", "Peach"]
+    readonly property bool codexRoutedThroughLoom: settingsManager.loomProxyEnabled && settingsManager.codexRoutesThroughLoom
 
     function displayMessage() {
         if (settingsMessage.length > 0) {
@@ -35,11 +35,65 @@ Item {
         return 0
     }
 
+    function proxyStateText() {
+        if (!settingsManager.loomProxyEnabled) {
+            return I18n.t("Stopped")
+        }
+        return proxyServer.running ? I18n.t("Listening") : I18n.status(proxyServer.statusMessage)
+    }
+
+    function applyLoomProxyRouting(enabled) {
+        if (enabled) {
+            if (!profileManager.applyLoomProxyToCodex(settingsManager.loomProxyUrl)) {
+                settingsManager.loomProxyEnabled = false
+                page.settingsMessage = profileManager.statusMessage
+                return false
+            }
+
+            settingsManager.loomProxyEnabled = true
+            page.settingsMessage = "Codex now routes through Loom"
+            return true
+        }
+
+        if (!profileManager.applyActiveProfileToCodex()) {
+            settingsManager.loomProxyEnabled = true
+            page.settingsMessage = profileManager.statusMessage
+            return false
+        }
+
+        settingsManager.loomProxyEnabled = false
+        page.settingsMessage = "Codex restored to active profile"
+        return true
+    }
+
+    function updateLoomProxyPort(value) {
+        var previousPort = settingsManager.loomProxyPort
+        settingsManager.loomProxyPort = Number(value)
+        loomProxyPortField.text = String(settingsManager.loomProxyPort)
+
+        if (!settingsManager.loomProxyEnabled) {
+            page.settingsMessage = "Loom proxy port updated"
+            return
+        }
+
+        if (profileManager.applyLoomProxyToCodex(settingsManager.loomProxyUrl)) {
+            page.settingsMessage = "Loom proxy port updated"
+            return
+        }
+
+        settingsManager.loomProxyPort = previousPort
+        loomProxyPortField.text = String(settingsManager.loomProxyPort)
+        page.settingsMessage = profileManager.statusMessage
+    }
+
     function tabTitle() {
         if (settingsTab === 1) {
             return I18n.t("Behavior")
         }
         if (settingsTab === 2) {
+            return I18n.t("Network")
+        }
+        if (settingsTab === 3) {
             return I18n.t("Storage & Privacy")
         }
         return I18n.t("Appearance")
@@ -50,21 +104,29 @@ Item {
             return I18n.t("Startup, restore, and confirmation preferences.")
         }
         if (settingsTab === 2) {
+            return I18n.t("Local proxy entrypoint for Codex requests.")
+        }
+        if (settingsTab === 3) {
             return I18n.t("Local data, backups, and secret visibility.")
         }
         return I18n.t("Theme, density, and accent preferences.")
     }
 
-    Rectangle {
+    function contentIndexForTab() {
+        if (settingsTab === 1) {
+            return 2
+        }
+        if (settingsTab === 2) {
+            return 1
+        }
+        return settingsTab
+    }
+
+    PageFrame {
         anchors.fill: parent
-        radius: Theme.cardRadius
-        color: "transparent"
-        border.width: 1
-        border.color: Theme.border
 
         RowLayout {
             anchors.fill: parent
-            anchors.margins: 26
             spacing: 24
 
             ColumnLayout {
@@ -100,11 +162,19 @@ Item {
                 }
 
                 SettingsNavItem {
-                    text: I18n.t("Storage & Privacy")
-                    iconName: "shield-check"
+                    text: I18n.t("Network")
+                    iconName: "network"
                     selected: page.settingsTab === 2
                     Layout.fillWidth: true
                     onClicked: page.settingsTab = 2
+                }
+
+                SettingsNavItem {
+                    text: I18n.t("Storage & Privacy")
+                    iconName: "shield-check"
+                    selected: page.settingsTab === 3
+                    Layout.fillWidth: true
+                    onClicked: page.settingsTab = 3
                 }
 
                 Item {
@@ -115,7 +185,6 @@ Item {
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.maximumWidth: page.maxContentWidth
                 spacing: 18
 
                 Column {
@@ -160,7 +229,7 @@ Item {
                     }
 
                     StackLayout {
-                        currentIndex: page.settingsTab
+                        currentIndex: page.contentIndexForTab()
                         width: settingsScroll.availableWidth
                         height: Math.max(implicitHeight, settingsScroll.availableHeight)
 
@@ -289,8 +358,8 @@ Item {
                                     }
 
                                     Row {
-                                        spacing: 10
-                                        Layout.preferredWidth: 118
+                                        spacing: 8
+                                        Layout.preferredWidth: 208
                                         Layout.preferredHeight: 28
 
                                         Repeater {
@@ -359,6 +428,149 @@ Item {
                                             settingsManager.language = page.languages[index]
                                             page.settingsMessage = "Language changed"
                                         }
+                                    }
+                                }
+                            }
+                        }
+
+                        ColumnLayout {
+                            spacing: 12
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 88
+                                radius: Theme.cardRadius
+                                color: Theme.panelRaised
+                                border.width: 1
+                                border.color: Theme.border
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 18
+
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        Text {
+                                            text: I18n.t("Loom Proxy")
+                                            color: Theme.text
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Text {
+                                            text: page.proxyStateText()
+                                            color: settingsManager.loomProxyEnabled ? (proxyServer.running ? Theme.success : Theme.warning) : Theme.muted
+                                            font.pixelSize: 12
+                                            width: parent.width
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+
+                                    ToggleSwitch {
+                                        checked: settingsManager.loomProxyEnabled
+                                        onToggled: page.applyLoomProxyRouting(checked)
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 88
+                                radius: Theme.cardRadius
+                                color: Theme.panelRaised
+                                border.width: 1
+                                border.color: Theme.border
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 18
+
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        Text {
+                                            text: I18n.t("Local Endpoint")
+                                            color: Theme.text
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Text {
+                                            text: proxyServer.listenUrl
+                                            color: Theme.muted
+                                            font.pixelSize: 12
+                                            width: parent.width
+                                            elide: Text.ElideMiddle
+                                        }
+                                    }
+
+                                    FormTextField {
+                                        id: loomProxyPortField
+                                        Layout.preferredWidth: 124
+                                        text: String(settingsManager.loomProxyPort)
+                                        inputMethodHints: Qt.ImhDigitsOnly
+                                        validator: IntValidator {
+                                            bottom: 1024
+                                            top: 65535
+                                        }
+                                        onEditingFinished: {
+                                            page.updateLoomProxyPort(text)
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 96
+                                radius: Theme.cardRadius
+                                color: Theme.panelRaised
+                                border.width: 1
+                                border.color: Theme.border
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 18
+
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        Text {
+                                            text: I18n.t("Codex Routing")
+                                            color: Theme.text
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Text {
+                                            text: page.codexRoutedThroughLoom ? I18n.t("Codex routes through Loom") : I18n.t("Codex uses active profile directly")
+                                            color: page.codexRoutedThroughLoom ? Theme.success : Theme.muted
+                                            font.pixelSize: 12
+                                            width: parent.width
+                                            elide: Text.ElideRight
+                                        }
+
+                                        Text {
+                                            text: I18n.status(proxyServer.statusMessage)
+                                            color: Theme.muted
+                                            font.pixelSize: 12
+                                            width: parent.width
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+
+                                    Pill {
+                                        text: page.codexRoutedThroughLoom ? I18n.t("Proxy on") : I18n.t("Direct")
+                                        iconName: page.codexRoutedThroughLoom ? "check" : "power"
+                                        fill: page.codexRoutedThroughLoom ? Theme.successSoft : Theme.panelSoft
+                                        foreground: page.codexRoutedThroughLoom ? Theme.success : Theme.muted
                                     }
                                 }
                             }
@@ -703,33 +915,16 @@ Item {
                     }
                 }
 
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 1
-                    color: Theme.border
-                }
-
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 10
 
-                    Text {
-                        text: page.displayMessage()
-                        color: Theme.muted
-                        font.pixelSize: 12
+                    Item {
                         Layout.fillWidth: true
-                        verticalAlignment: Text.AlignVCenter
-                        elide: Text.ElideRight
                     }
 
                     ActionButton {
-                        text: I18n.t("Clear Cache")
-                        iconName: "trash-2"
-                        onClicked: page.settingsMessage = "Cache cleared"
-                    }
-
-                    ActionButton {
-                        text: I18n.t("Save Settings")
+                        text: I18n.t("Save")
                         iconName: "save"
                         variant: "primary"
                         onClicked: {

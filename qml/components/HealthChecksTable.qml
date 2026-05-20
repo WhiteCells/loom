@@ -107,175 +107,178 @@ Item {
             }
         }
 
-        ScrollView {
-            id: checksScroll
+        Item {
+            id: tableBody
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            contentWidth: availableWidth
-            ScrollBar.horizontal: StyledScrollBar {
-                policy: ScrollBar.AlwaysOff
-                parent: checksScroll
-            }
-            ScrollBar.vertical: StyledScrollBar {
-                policy: ScrollBar.AsNeeded
-                parent: checksScroll
-            }
 
-            ColumnLayout {
-                width: checksScroll.availableWidth
+            ListView {
+                id: checksList
+                anchors.fill: parent
+                visible: root.rowCount > 0
+                model: root.model
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                cacheBuffer: root.tableRowHeight * 4
+                reuseItems: true
                 spacing: 0
 
-                Item {
-                    visible: root.rowCount === 0
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: Math.max(180, checksScroll.availableHeight)
+                ScrollBar.horizontal: StyledScrollBar {
+                    policy: ScrollBar.AlwaysOff
+                    parent: checksList
+                }
+                ScrollBar.vertical: StyledScrollBar {
+                    policy: ScrollBar.AsNeeded
+                    parent: checksList
+                }
 
-                    Column {
-                        anchors.centerIn: parent
-                        spacing: 14
+                delegate: Item {
+                    id: tableRow
 
-                        Rectangle {
-                            width: 44
-                            height: 44
-                            radius: height / 2
-                            color: Theme.panelSoft
-                            anchors.horizontalCenter: parent.horizontalCenter
+                    required property int index
+                    required property var modelData
 
-                            Icon {
-                                anchors.centerIn: parent
-                                name: "activity"
-                                size: 20
-                                color: Theme.iconSubtle
+                    width: ListView.view ? ListView.view.width : root.width
+                    height: root.tableRowHeight
+                    readonly property bool hovered: rowHover.hovered
+                    readonly property bool ok: tableRow.modelData.status === "OK"
+                    readonly property color statusColor: ok ? Theme.success : Theme.warning
+                    readonly property color statusFill: ok ? Theme.successSoft : Theme.warningSoft
+
+                    Rectangle {
+                        anchors.fill: parent
+                        color: tableRow.hovered ? Theme.tableRowHover : "transparent"
+                        opacity: tableRow.hovered ? 1 : (tableRow.ok ? 0 : 0.16)
+
+                        Behavior on opacity {
+                            enabled: tableRow.hovered
+
+                            NumberAnimation {
+                                duration: Theme.hoverDuration
+                                easing.type: Easing.OutCubic
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: root.tableHorizontalPadding
+                        anchors.rightMargin: root.tableHorizontalPadding
+                        spacing: root.tableColumnGap
+
+                        Text {
+                            text: tableRow.modelData.profile
+                            color: Theme.text
+                            font.pixelSize: 13
+                            font.weight: Font.DemiBold
+                            Layout.preferredWidth: root.tableProfileWidth
+                            Layout.minimumWidth: 112
+                            verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            text: tableRow.modelData.endpoint
+                            color: Theme.muted
+                            font.pixelSize: 13
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: root.tableEndpointWidth
+                            Layout.minimumWidth: 180
+                            verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            visible: root.showCheckedAt && !root.compactTable
+                            text: tableRow.modelData.checkedAt
+                            color: Theme.muted
+                            font.pixelSize: 13
+                            Layout.preferredWidth: root.tableCheckedAtWidth
+                            Layout.minimumWidth: root.compactTable ? 0 : 112
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        Item {
+                            Layout.preferredWidth: root.tableStatusWidth
+                            Layout.minimumWidth: 96
+
+                            Pill {
+                                text: tableRow.modelData.status
+                                iconName: tableRow.ok ? "check" : "triangle-alert"
+                                fill: tableRow.statusFill
+                                foreground: tableRow.statusColor
+                                horizontalPadding: 11
+                                anchors.verticalCenter: parent.verticalCenter
                             }
                         }
 
                         Text {
-                            text: I18n.t("No checks yet")
-                            color: Theme.text
-                            font.pixelSize: 14
-                            font.weight: Font.DemiBold
-                            anchors.horizontalCenter: parent.horizontalCenter
-                        }
-
-                        ActionButton {
-                            text: I18n.t("Run Health Check")
-                            iconName: "refresh-cw"
-                            variant: "secondary"
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            onClicked: root.runRequested()
+                            text: tableRow.modelData.latency
+                            color: tableRow.ok ? Theme.muted : Theme.warning
+                            font.pixelSize: 13
+                            font.weight: tableRow.ok ? Font.Normal : Font.DemiBold
+                            Layout.preferredWidth: root.tableLatencyWidth
+                            Layout.minimumWidth: 72
+                            horizontalAlignment: Text.AlignRight
+                            verticalAlignment: Text.AlignVCenter
                         }
                     }
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.leftMargin: root.tableHorizontalPadding
+                        anchors.rightMargin: root.tableHorizontalPadding
+                        height: 1
+                        color: Theme.tableDivider
+                        opacity: tableRow.index < root.rowCount - 1 ? 0.72 : 0
+                    }
+
+                    HoverHandler {
+                        id: rowHover
+                    }
                 }
+            }
 
-                Repeater {
-                    model: root.model
+            Item {
+                visible: root.rowCount === 0
+                anchors.fill: parent
 
-                    delegate: Item {
-                        id: tableRow
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 14
 
-                        required property int index
-                        required property var modelData
+                    Rectangle {
+                        width: 44
+                        height: 44
+                        radius: height / 2
+                        color: Theme.panelSoft
+                        anchors.horizontalCenter: parent.horizontalCenter
 
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: root.tableRowHeight
-                        implicitHeight: root.tableRowHeight
-                        readonly property bool hovered: rowHover.hovered
-                        readonly property bool ok: tableRow.modelData.status === "OK"
-                        readonly property color statusColor: ok ? Theme.success : Theme.warning
-                        readonly property color statusFill: ok ? Theme.successSoft : Theme.warningSoft
-
-                        Rectangle {
-                            anchors.fill: parent
-                            color: tableRow.hovered ? Theme.tableRowHover : "transparent"
-                            opacity: tableRow.hovered ? 1 : (tableRow.ok ? 0 : 0.16)
-
-                            Behavior on opacity {
-                                NumberAnimation {
-                                    duration: Theme.hoverDuration
-                                    easing.type: Easing.OutCubic
-                                }
-                            }
+                        Icon {
+                            anchors.centerIn: parent
+                            name: "activity"
+                            size: 20
+                            color: Theme.iconSubtle
                         }
+                    }
 
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.leftMargin: root.tableHorizontalPadding
-                            anchors.rightMargin: root.tableHorizontalPadding
-                            spacing: root.tableColumnGap
+                    Text {
+                        text: I18n.t("No health snapshot yet")
+                        color: Theme.text
+                        font.pixelSize: 14
+                        font.weight: Font.DemiBold
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
 
-                            Text {
-                                text: tableRow.modelData.profile
-                                color: Theme.text
-                                font.pixelSize: 13
-                                font.weight: Font.DemiBold
-                                Layout.preferredWidth: root.tableProfileWidth
-                                Layout.minimumWidth: 112
-                                verticalAlignment: Text.AlignVCenter
-                                elide: Text.ElideRight
-                            }
-
-                            Text {
-                                text: tableRow.modelData.endpoint
-                                color: Theme.muted
-                                font.pixelSize: 13
-                                Layout.fillWidth: true
-                                Layout.preferredWidth: root.tableEndpointWidth
-                                Layout.minimumWidth: 180
-                                verticalAlignment: Text.AlignVCenter
-                                elide: Text.ElideRight
-                            }
-
-                            Text {
-                                visible: root.showCheckedAt && !root.compactTable
-                                text: tableRow.modelData.checkedAt
-                                color: Theme.muted
-                                font.pixelSize: 13
-                                Layout.preferredWidth: root.tableCheckedAtWidth
-                                Layout.minimumWidth: root.compactTable ? 0 : 112
-                                verticalAlignment: Text.AlignVCenter
-                            }
-
-                            Item {
-                                Layout.preferredWidth: root.tableStatusWidth
-                                Layout.minimumWidth: 96
-
-                                Pill {
-                                    text: tableRow.modelData.status
-                                    iconName: tableRow.ok ? "check" : "triangle-alert"
-                                    fill: tableRow.statusFill
-                                    foreground: tableRow.statusColor
-                                    horizontalPadding: 11
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-                            }
-
-                            Text {
-                                text: tableRow.modelData.latency
-                                color: tableRow.ok ? Theme.muted : Theme.warning
-                                font.pixelSize: 13
-                                font.weight: tableRow.ok ? Font.Normal : Font.DemiBold
-                                Layout.preferredWidth: root.tableLatencyWidth
-                                Layout.minimumWidth: 72
-                                horizontalAlignment: Text.AlignRight
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                        }
-
-                        Rectangle {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.bottom: parent.bottom
-                            anchors.leftMargin: root.tableHorizontalPadding
-                            anchors.rightMargin: root.tableHorizontalPadding
-                            height: 1
-                            color: Theme.tableDivider
-                            opacity: tableRow.index < root.rowCount - 1 ? 0.72 : 0
-                        }
-
-                        HoverHandler {
-                            id: rowHover
-                        }
+                    ActionButton {
+                        text: I18n.t("Refresh Status")
+                        iconName: "refresh-cw"
+                        variant: "secondary"
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        onClicked: root.runRequested()
                     }
                 }
             }

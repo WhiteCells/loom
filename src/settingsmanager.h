@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QJsonObject>
+#include <QTimer>
 #include <QVariantMap>
 
 class SettingsManager : public QObject
@@ -13,6 +14,10 @@ class SettingsManager : public QObject
     Q_PROPERTY(bool launchAtLogin READ launchAtLogin WRITE setLaunchAtLogin NOTIFY launchAtLoginChanged)
     Q_PROPERTY(bool restoreLastSection READ restoreLastSection WRITE setRestoreLastSection NOTIFY restoreLastSectionChanged)
     Q_PROPERTY(bool healthCheckOnActivate READ healthCheckOnActivate WRITE setHealthCheckOnActivate NOTIFY healthCheckOnActivateChanged)
+    Q_PROPERTY(bool loomProxyEnabled READ loomProxyEnabled WRITE setLoomProxyEnabled NOTIFY loomProxyEnabledChanged)
+    Q_PROPERTY(int loomProxyPort READ loomProxyPort WRITE setLoomProxyPort NOTIFY loomProxyPortChanged)
+    Q_PROPERTY(QString loomProxyUrl READ loomProxyUrl NOTIFY loomProxyPortChanged)
+    Q_PROPERTY(bool codexRoutesThroughLoom READ codexRoutesThroughLoom WRITE setCodexRoutesThroughLoom NOTIFY codexRoutesThroughLoomChanged)
     Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
     Q_PROPERTY(bool confirmProfileDeletion READ confirmProfileDeletion CONSTANT)
     Q_PROPERTY(bool maskSecrets READ maskSecrets WRITE setMaskSecrets NOTIFY maskSecretsChanged)
@@ -29,6 +34,7 @@ class SettingsManager : public QObject
 
 public:
     explicit SettingsManager(QObject *parent = nullptr);
+    ~SettingsManager() override;
 
     bool darkTheme() const;
     void setDarkTheme(bool darkTheme);
@@ -47,6 +53,16 @@ public:
 
     bool healthCheckOnActivate() const;
     void setHealthCheckOnActivate(bool healthCheckOnActivate);
+
+    bool loomProxyEnabled() const;
+    void setLoomProxyEnabled(bool loomProxyEnabled);
+
+    int loomProxyPort() const;
+    void setLoomProxyPort(int loomProxyPort);
+    QString loomProxyUrl() const;
+
+    bool codexRoutesThroughLoom() const;
+    void setCodexRoutesThroughLoom(bool codexRoutesThroughLoom);
 
     QString language() const;
     void setLanguage(const QString &language);
@@ -98,6 +114,9 @@ signals:
     void launchAtLoginChanged();
     void restoreLastSectionChanged();
     void healthCheckOnActivateChanged();
+    void loomProxyEnabledChanged();
+    void loomProxyPortChanged();
+    void codexRoutesThroughLoomChanged();
     void languageChanged();
     void maskSecretsChanged();
     void keepBackupsChanged();
@@ -124,6 +143,9 @@ private:
     bool m_launchAtLogin = false;
     bool m_restoreLastSection = true;
     bool m_healthCheckOnActivate = false;
+    bool m_loomProxyEnabled = false;
+    int m_loomProxyPort = 14567;
+    bool m_codexRoutesThroughLoom = false;
     QString m_language = QStringLiteral("en");
     bool m_maskSecrets = true;
     bool m_keepBackups = true;
@@ -143,4 +165,5 @@ private:
     bool m_interfaceRequiresOpenAiAuth = true;
     QString m_statusMessage;
     bool m_loading = false;
+    QTimer m_persistTimer;
 };

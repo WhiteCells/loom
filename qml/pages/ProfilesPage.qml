@@ -212,19 +212,22 @@ Item {
     function loadEditor() {
         page.editorWarning = ""
         if (page.editorCreating) {
-            var defaults = settingsManager.interfaceConfig
-            editorNameField.text = defaults.profileName || ""
-            editorProviderBox.currentIndex = page.indexFor(page.providers, defaults.modelProvider || "OpenAI")
-            editorBaseUrlField.text = defaults.baseUrl || "https://api.openai.com/v1"
+            editorNameField.text = ""
+            editorProviderBox.currentIndex = -1
+            editorBaseUrlField.text = ""
             editorApiKeyField.text = ""
             editorApiKeyField.placeholderText = "sk-..."
-            editorHttpProxyField.text = defaults.httpProxy || ""
-            editorHttpsProxyField.text = defaults.httpsProxy || ""
-            editorStorageSwitch.checked = defaults.disableResponseStorage !== false
-            editorWireApiBox.currentIndex = page.indexFor(page.wireApis, defaults.wireApi || "responses")
-            editorOpenAiAuthSwitch.checked = defaults.requiresOpenAiAuth !== false
-            page.refreshEditorModelOptions(defaults.model || "gpt-5.5")
-            editorEffortBox.currentIndex = page.indexFor(page.efforts, defaults.reasoningEffort || "high")
+            editorHttpProxyField.text = ""
+            editorHttpsProxyField.text = ""
+            editorStorageSwitch.checked = true
+            editorWireApiBox.currentIndex = page.indexFor("responses")
+            editorOpenAiAuthSwitch.checked = true
+            page.editorModelOptions = []
+            editorModelBox.currentIndex = -1
+            page.editorModelOptionsReady = false
+            page.editorModelMessageProvider = ""
+            page.editorModelMessageKey = "Endpoint required before loading model options."
+            editorEffortBox.currentIndex = -1
             return
         }
 
@@ -343,12 +346,9 @@ Item {
         }
     }
 
-    Rectangle {
+    PageFrame {
         anchors.fill: parent
-        radius: Theme.cardRadius
-        color: "transparent"
-        border.width: 1
-        border.color: Theme.border
+        padding: 0
         clip: true
 
         RowLayout {

@@ -32,17 +32,13 @@ Item {
         }
     }
 
-    Rectangle {
+    PageFrame {
         anchors.fill: parent
-        radius: Theme.cardRadius
-        color: "transparent"
-        border.width: 1
-        border.color: Theme.border
+        padding: 22
         clip: false
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 22
             spacing: 14
 
             Rectangle {
@@ -149,7 +145,7 @@ Item {
                     anchors.rightMargin: 14
                     anchors.topMargin: 13
                     anchors.bottomMargin: 13
-                    columns: page.width < 1120 ? 3 : 6
+                    columns: page.width < 1120 ? 3 : 5
                     columnSpacing: 12
                     rowSpacing: 12
 
@@ -157,7 +153,6 @@ Item {
                     SummaryMetric { label: I18n.t("Cached"); value: page.formatNumber(summary.cachedInputTokens); iconName: "shield-check"; markerColor: Theme.success }
                     SummaryMetric { label: I18n.t("Output Tokens"); value: page.formatNumber(summary.outputTokens); iconName: "activity"; markerColor: Theme.warning }
                     SummaryMetric { label: I18n.t("Reasoning"); value: page.formatNumber(summary.reasoningOutputTokens); iconName: "bot"; markerColor: Theme.danger }
-                    SummaryMetric { label: I18n.t("Range Usage"); value: page.formatNumber(summary.totalTokens); iconName: "network"; markerColor: Theme.accentHover }
                     SummaryMetric { label: I18n.t("Updated"); value: I18n.status(summary.lastUpdated); iconName: "refresh-cw"; markerColor: Theme.dim }
                 }
             }
@@ -923,10 +918,22 @@ Item {
             return count === 1 ? 0.5 : index / (count - 1)
         }
 
+        function schedulePaint() {
+            paintTimer.restart()
+        }
+
+        Timer {
+            id: paintTimer
+            interval: 35
+            repeat: false
+            onTriggered: canvas.requestPaint()
+        }
+
         Canvas {
             id: canvas
             anchors.fill: parent
             antialiasing: true
+            renderStrategy: Canvas.Threaded
 
             onPaint: {
                 var ctx = getContext("2d")
@@ -1007,11 +1014,11 @@ Item {
                 target: Theme
 
                 function onDarkChanged() {
-                    canvas.requestPaint()
+                    chart.schedulePaint()
                 }
 
                 function onAccentIndexChanged() {
-                    canvas.requestPaint()
+                    chart.schedulePaint()
                 }
             }
         }
@@ -1039,9 +1046,9 @@ Item {
             font.pixelSize: 10
         }
 
-        onModelChanged: canvas.requestPaint()
-        onHourlyChanged: canvas.requestPaint()
-        onWidthChanged: canvas.requestPaint()
-        onHeightChanged: canvas.requestPaint()
+        onModelChanged: chart.schedulePaint()
+        onHourlyChanged: chart.schedulePaint()
+        onWidthChanged: chart.schedulePaint()
+        onHeightChanged: chart.schedulePaint()
     }
 }

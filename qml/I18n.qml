@@ -45,6 +45,11 @@ QtObject {
             return arg(t("%1 is now active"), match[1])
         }
 
+        match = String(message).match(/^(.*) is now active for Loom$/)
+        if (match) {
+            return arg(t("%1 is now active for Loom"), match[1])
+        }
+
         match = String(message).match(/^(.*) created$/)
         if (match) {
             return arg(t("%1 created"), match[1])
@@ -73,6 +78,26 @@ QtObject {
         match = String(message).match(/^Health check finished for (.*)$/)
         if (match) {
             return arg(t("Health check finished for %1"), match[1])
+        }
+
+        match = String(message).match(/^Health checks refreshed for (\d+) profiles$/)
+        if (match) {
+            return arg(t("Health checks refreshed for %1 profiles"), match[1])
+        }
+
+        match = String(message).match(/^Loom proxy listening on (.*)$/)
+        if (match) {
+            return arg(t("Loom proxy listening on %1"), match[1])
+        }
+
+        match = String(message).match(/^Failed to start Loom proxy on port (\d+)$/)
+        if (match) {
+            return arg(t("Failed to start Loom proxy on port %1"), match[1])
+        }
+
+        match = String(message).match(/^(.*) applied to Codex$/)
+        if (match) {
+            return arg(t("%1 applied to Codex"), match[1])
         }
 
         match = String(message).match(/^(.*) (.*) Configuration$/)
@@ -137,12 +162,16 @@ QtObject {
         "System Health": "系统健康",
         "Token Usage (Today)": "今日 Token 用量",
         "Recent Health Checks": "最近健康检查",
+        "Health Snapshot": "健康快照",
         "Profile": "配置",
         "Endpoint": "端点",
         "Status": "状态",
         "Latency": "延迟",
         "Checked At": "检查时间",
         "Run Health Check": "运行健康检查",
+        "Refresh Status": "刷新状态",
+        "Refresh all profiles": "刷新全部配置",
+        "No health snapshot yet": "尚未生成健康快照",
         "Usage Today": "今日用量",
         "Tracked Profiles": "已跟踪配置",
         "Health": "健康",
@@ -151,7 +180,6 @@ QtObject {
         "Input Tokens": "输入 Token",
         "Output Tokens": "输出 Token",
         "Context Window": "上下文窗口",
-        "Range Usage": "区间总用量",
         "%1 sessions": "%1 个会话",
         "%1 cached": "%1 缓存",
         "%1 reasoning": "%1 推理",
@@ -192,7 +220,9 @@ QtObject {
         "Appearance": "外观",
         "Behavior": "行为",
         "Storage & Privacy": "存储与隐私",
+        "Network": "网络",
         "Startup, restore, and confirmation preferences.": "启动、恢复和确认偏好。",
+        "Local proxy entrypoint for Codex requests.": "Codex 请求的本地代理入口。",
         "Local data, backups, and secret visibility.": "本地数据、备份和密钥可见性。",
         "Theme, density, and accent preferences.": "主题、密度和强调色偏好。",
         "Color Theme": "色彩主题",
@@ -205,6 +235,9 @@ QtObject {
         "Blue": "蓝色",
         "Green": "绿色",
         "Amber": "琥珀色",
+        "Sky": "浅蓝",
+        "Mint": "浅绿",
+        "Peach": "浅橙",
         "Language": "语言",
         "English": "英文",
         "Chinese": "中文",
@@ -215,6 +248,14 @@ QtObject {
         "Confirm Profile Deletion": "删除配置需确认",
         "Required": "必需",
         "Health Check on Activate": "启用配置时健康检查",
+        "Loom Proxy": "Loom 代理",
+        "Listening": "监听中",
+        "Stopped": "已停止",
+        "Local Endpoint": "本地端点",
+        "Codex Routing": "Codex 路由",
+        "Codex routes through Loom": "Codex 通过 Loom 路由",
+        "Codex uses active profile directly": "Codex 使用当前配置直连",
+        "Use Loom": "使用 Loom",
         "Data Location": "数据位置",
         "Reveal": "显示",
         "Mask Secrets": "隐藏密钥",
@@ -223,8 +264,7 @@ QtObject {
         "7 days": "7 天",
         "14 days": "14 天",
         "30 days": "30 天",
-        "Clear Cache": "清除缓存",
-        "Save Settings": "保存设置",
+        "Save": "保存",
         "Settings are local": "设置保存在本地",
         "Dark theme enabled": "已启用深色主题",
         "Light theme enabled": "已启用浅色主题",
@@ -237,12 +277,21 @@ QtObject {
         "Last section restore disabled": "已关闭恢复上次页面",
         "Health check on activate enabled": "已启用激活时健康检查",
         "Health check on activate disabled": "已关闭激活时健康检查",
+        "Loom proxy enabled": "已启用 Loom 代理",
+        "Loom proxy disabled": "已关闭 Loom 代理",
+        "Loom proxy port updated": "Loom 代理端口已更新",
+        "Loom proxy listening on %1": "Loom 代理正在监听 %1",
+        "Failed to start Loom proxy on port %1": "无法在端口 %1 启动 Loom 代理",
+        "Codex now routes through Loom": "Codex 现在通过 Loom 路由",
+        "Codex restored to active profile": "Codex 已恢复为当前启用配置直连",
+        "%1 applied to Codex": "%1 已应用到 Codex",
+        "%1 is now active for Loom": "%1 已作为 Loom 代理配置启用",
+        "No active profile selected": "未选择启用配置",
         "Secret masking enabled": "已启用密钥隐藏",
         "Secret masking disabled": "已关闭密钥隐藏",
         "Local backups enabled": "已启用本地备份",
         "Local backups disabled": "已关闭本地备份",
         "%1 backup retention enabled": "备份保留已设为%1",
-        "Cache cleared": "缓存已清除",
 
         "Create Profile": "创建配置",
         "Search profiles": "搜索配置",
@@ -328,6 +377,7 @@ QtObject {
         "%1 deleted": "%1 已删除",
         "Editing %1": "正在编辑 %1",
         "Health check finished for %1": "%1 的健康检查已完成",
+        "Health checks refreshed for %1 profiles": "已刷新 %1 个配置的健康状态",
         "%1 saved": "%1 已保存",
         "%1 selected": "已选择 %1",
         "Settings loaded from %1": "已从 %1 加载设置",

@@ -96,16 +96,10 @@ ApplicationWindow {
 
                             Row {
                                 id: brandContent
+                                anchors.left: parent.left
+                                anchors.leftMargin: 10
                                 anchors.verticalCenter: parent.verticalCenter
-                                spacing: 8
-
-                                Icon {
-                                    id: brandIcon
-                                    name: "bot"
-                                    size: 18
-                                    color: Theme.icon
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
+                                spacing: 0
 
                                 Text {
                                     id: brandText
@@ -191,29 +185,39 @@ ApplicationWindow {
                     }
                 }
 
-                DashboardPage {
+                Loader {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    active: root.currentPageIndex === 0 || status === Loader.Ready
+                    sourceComponent: active ? dashboardPageComponent : null
                 }
 
-                ProfilesPage {
+                Loader {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    active: root.currentPageIndex === 1 || status === Loader.Ready
+                    sourceComponent: active ? profilesPageComponent : null
                 }
 
-                HealthChecksPage {
+                Loader {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    active: root.currentPageIndex === 2 || status === Loader.Ready
+                    sourceComponent: active ? healthChecksPageComponent : null
                 }
 
-                TokenUsagePage {
+                Loader {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    active: root.currentPageIndex === 3 || status === Loader.Ready
+                    sourceComponent: active ? tokenUsagePageComponent : null
                 }
 
-                SettingsPage {
+                Loader {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    active: root.currentPageIndex === 4 || status === Loader.Ready
+                    sourceComponent: active ? settingsPageComponent : null
                 }
             }
 
@@ -242,6 +246,41 @@ ApplicationWindow {
                     elide: Text.ElideRight
                 }
             }
+        }
+    }
+
+    Component {
+        id: dashboardPageComponent
+
+        DashboardPage {
+        }
+    }
+
+    Component {
+        id: profilesPageComponent
+
+        ProfilesPage {
+        }
+    }
+
+    Component {
+        id: healthChecksPageComponent
+
+        HealthChecksPage {
+        }
+    }
+
+    Component {
+        id: tokenUsagePageComponent
+
+        TokenUsagePage {
+        }
+    }
+
+    Component {
+        id: settingsPageComponent
+
+        SettingsPage {
         }
     }
 }

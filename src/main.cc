@@ -10,6 +10,7 @@
 #include <QWindow>
 
 #include "profilemanager.h"
+#include "proxyserver.h"
 #include "settingsmanager.h"
 #include "singleinstanceguard.h"
 #include "traycontroller.h"
@@ -110,14 +111,18 @@ int main(int argc, char *argv[])
 
     ProfileManager profileManager;
     SettingsManager settingsManager;
+    profileManager.setCodexRoutesThroughLoom(settingsManager.codexRoutesThroughLoom());
+    ProxyServer proxyServer(&profileManager, &settingsManager);
     profileManager.setActiveProfileByFolderName(settingsManager.activeProfileFolder());
     profileManager.selectProfileByFolderName(settingsManager.selectedProfileFolder());
+    proxyServer.reconcile();
     if (settingsManager.restoreLastSection()) {
         profileManager.setActiveSection(settingsManager.lastSection());
     }
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("profileManager"), &profileManager);
+    engine.rootContext()->setContextProperty(QStringLiteral("proxyServer"), &proxyServer);
     engine.rootContext()->setContextProperty(QStringLiteral("settingsManager"), &settingsManager);
 
     QObject::connect(&profileManager, &ProfileManager::activeSectionChanged, &settingsManager, [&profileManager, &settingsManager] {
@@ -125,6 +130,10 @@ int main(int argc, char *argv[])
             settingsManager.setLastSection(profileManager.activeSection());
         }
     }, Qt::QueuedConnection);
+
+    QObject::connect(&settingsManager, &SettingsManager::codexRoutesThroughLoomChanged, &profileManager, [&profileManager, &settingsManager] {
+        profileManager.setCodexRoutesThroughLoom(settingsManager.codexRoutesThroughLoom());
+    });
 
     QObject::connect(&profileManager, &ProfileManager::currentProfileChanged, &settingsManager, [&profileManager, &settingsManager] {
         const QVariantMap profile = profileManager.currentProfile();

@@ -30,6 +30,7 @@ set_source_files_properties(qml/components/FormComboBox.qml PROPERTIES QT_RESOUR
 set_source_files_properties(qml/components/FormTextField.qml PROPERTIES QT_RESOURCE_ALIAS components/FormTextField.qml)
 set_source_files_properties(qml/components/Icon.qml PROPERTIES QT_RESOURCE_ALIAS components/Icon.qml)
 set_source_files_properties(qml/components/NavButton.qml PROPERTIES QT_RESOURCE_ALIAS components/NavButton.qml)
+set_source_files_properties(qml/components/PageFrame.qml PROPERTIES QT_RESOURCE_ALIAS components/PageFrame.qml)
 set_source_files_properties(qml/components/Pill.qml PROPERTIES QT_RESOURCE_ALIAS components/Pill.qml)
 set_source_files_properties(qml/components/SettingsNavItem.qml PROPERTIES QT_RESOURCE_ALIAS components/SettingsNavItem.qml)
 set_source_files_properties(qml/components/SidebarItem.qml PROPERTIES QT_RESOURCE_ALIAS components/SidebarItem.qml)
@@ -46,6 +47,8 @@ qt_add_executable(${PROJECT_NAME}
     src/main.cc
     src/profilemanager.cc
     src/profilemanager.h
+    src/proxyserver.cc
+    src/proxyserver.h
     src/settingsmanager.cc
     src/settingsmanager.h
     src/singleinstanceguard.cc
@@ -70,6 +73,7 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/components/FormTextField.qml
         qml/components/Icon.qml
         qml/components/NavButton.qml
+        qml/components/PageFrame.qml
         qml/components/Pill.qml
         qml/components/SettingsNavItem.qml
         qml/components/SidebarItem.qml

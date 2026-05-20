@@ -6,6 +6,21 @@ QtObject {
     property bool dark: true
     property int accentIndex: 0
 
+    function palette(values) {
+        if (!values || values.length === 0) {
+            return ""
+        }
+
+        var index = accentIndex
+        if (index < 0) {
+            index = 0
+        }
+        if (index >= values.length) {
+            index = values.length - 1
+        }
+        return values[index]
+    }
+
     readonly property color window: dark ? "#0d1112" : "#eef2f1"
     readonly property color panel: dark ? "#151a1b" : "#f8faf9"
     readonly property color panelRaised: dark ? "#1a2022" : "#f6f8f7"
@@ -20,9 +35,6 @@ QtObject {
     readonly property color tableHeader: dark ? "#202729" : "#eef4f2"
     readonly property color tableRowHover: dark ? "#243033" : "#e8f0ee"
     readonly property color tableDivider: dark ? "#293335" : "#dfe7e5"
-    readonly property color selected: accentIndex === 1
-                                      ? (dark ? "#0d3022" : "#d7efe2")
-                                      : (accentIndex === 2 ? (dark ? "#342710" : "#f5e7c9") : (dark ? "#172846" : "#dce8f6"))
     readonly property color sidebar: dark ? "#121718" : "#e3eaea"
     readonly property color overlay: dark ? "#99000000" : "#660b1720"
     readonly property color border: dark ? "#30393b" : "#cbd5d3"
@@ -41,9 +53,25 @@ QtObject {
     readonly property color accentAmber: dark ? "#ffba49" : "#9a6500"
     readonly property color accentAmberHover: dark ? "#ffc76a" : "#825300"
     readonly property color accentAmberSoft: dark ? "#45320d" : "#f5e7c9"
-    readonly property color accent: accentIndex === 1 ? accentGreen : (accentIndex === 2 ? accentAmber : accentBlue)
-    readonly property color accentHover: accentIndex === 1 ? accentGreenHover : (accentIndex === 2 ? accentAmberHover : accentBlueHover)
-    readonly property color accentSoft: accentIndex === 1 ? accentGreenSoft : (accentIndex === 2 ? accentAmberSoft : accentBlueSoft)
+    readonly property color accentSky: dark ? "#67c3ff" : "#a7d9ff"
+    readonly property color accentSkyHover: dark ? "#86d1ff" : "#7cbcf0"
+    readonly property color accentSkySoft: dark ? "#11354d" : "#d9efff"
+    readonly property color accentMint: dark ? "#7fe1b2" : "#bdeccb"
+    readonly property color accentMintHover: dark ? "#9ae9c5" : "#8cd7ab"
+    readonly property color accentMintSoft: dark ? "#103d2e" : "#daf6eb"
+    readonly property color accentPeach: dark ? "#ffd29c" : "#ffe0bb"
+    readonly property color accentPeachHover: dark ? "#ffddb1" : "#f0c58f"
+    readonly property color accentPeachSoft: dark ? "#49311a" : "#faecd7"
+    readonly property var accentBases: [accentBlue, accentGreen, accentAmber, accentSky, accentMint, accentPeach]
+    readonly property var accentHovers: [accentBlueHover, accentGreenHover, accentAmberHover, accentSkyHover, accentMintHover, accentPeachHover]
+    readonly property var accentSofts: [accentBlueSoft, accentGreenSoft, accentAmberSoft, accentSkySoft, accentMintSoft, accentPeachSoft]
+    readonly property var selectedDark: ["#172846", "#0d3022", "#342710", "#14354d", "#103d2e", "#49311a"]
+    readonly property var selectedLight: ["#dce8f6", "#d7efe2", "#f5e7c9", "#d9efff", "#daf6eb", "#faecd7"]
+    readonly property var accentTextColors: ["#f8fbfb", "#f8fbfb", dark ? "#1f1705" : "#f8fbfb", "#182121", "#182121", "#182121"]
+    readonly property color selected: palette(dark ? selectedDark : selectedLight)
+    readonly property color accent: palette(accentBases)
+    readonly property color accentHover: palette(accentHovers)
+    readonly property color accentSoft: palette(accentSofts)
     readonly property color success: dark ? "#18c278" : "#087f4d"
     readonly property color successSoft: dark ? "#073d26" : "#d7efe2"
     readonly property color warning: dark ? "#ffba49" : "#9a6500"
@@ -53,7 +81,7 @@ QtObject {
     readonly property color dangerHover: dark ? "#5b2626" : "#efcccc"
     readonly property color dangerPressed: dark ? "#4d1f1f" : "#e8bcbc"
     readonly property color dangerText: dark ? "#f8fbfb" : danger
-    readonly property color accentText: accentIndex === 2 && dark ? "#1f1705" : "#f8fbfb"
+    readonly property color accentText: palette(accentTextColors)
     readonly property int pageRadius: 18
     readonly property int cardRadius: 14
     readonly property int controlRadius: 11

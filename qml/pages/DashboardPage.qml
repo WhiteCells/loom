@@ -9,16 +9,12 @@ Item {
         return Number(value).toLocaleString(Qt.locale("en_US"), "f", 0)
     }
 
-    Rectangle {
+    PageFrame {
         anchors.fill: parent
-        radius: Theme.cardRadius
-        color: "transparent"
-        border.width: 1
-        border.color: Theme.border
+        padding: 28
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 28
             spacing: 26
 
             Text {
@@ -63,7 +59,7 @@ Item {
             }
 
             Text {
-                text: I18n.t("Recent Health Checks")
+                text: I18n.t("Health Snapshot")
                 color: Theme.text
                 font.pixelSize: 20
                 font.weight: Font.Bold
@@ -83,7 +79,7 @@ Item {
                     anchors.fill: parent
                     model: profileManager.healthChecks
                     showCheckedAt: false
-                    onRunRequested: profileManager.runHealthCheck()
+                    onRunRequested: profileManager.refreshHealthChecks()
                 }
             }
         }

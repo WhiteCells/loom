@@ -23,6 +23,7 @@ class ProfileManager : public QObject
     Q_PROPERTY(QVariantList tokenSessions READ tokenSessions NOTIFY tokenUsageChanged)
     Q_PROPERTY(QVariantMap tokenSummary READ tokenSummary NOTIFY tokenUsageChanged)
     Q_PROPERTY(QVariantList tokenUsage READ tokenUsage NOTIFY tokenUsageChanged)
+    Q_PROPERTY(bool codexRoutesThroughLoom READ codexRoutesThroughLoom WRITE setCodexRoutesThroughLoom NOTIFY codexRoutesThroughLoomChanged)
 
 public:
     explicit ProfileManager(QObject *parent = nullptr);
@@ -40,6 +41,9 @@ public:
     QVariantList tokenSessions() const;
     QVariantMap tokenSummary() const;
     QVariantList tokenUsage() const;
+    QVariantMap activeProfileProxyConfig() const;
+    bool codexRoutesThroughLoom() const;
+    void setCodexRoutesThroughLoom(bool codexRoutesThroughLoom);
 
     Q_INVOKABLE bool activateSelectedProfile();
     Q_INVOKABLE void createProfile();
@@ -57,6 +61,9 @@ public:
                                                     bool requiresOpenAiAuth);
     Q_INVOKABLE void deleteSelectedProfile();
     Q_INVOKABLE void editSelectedProfile();
+    Q_INVOKABLE bool applyActiveProfileToCodex();
+    Q_INVOKABLE bool applyLoomProxyToCodex(const QString &loomBaseUrl);
+    Q_INVOKABLE void refreshHealthChecks();
     Q_INVOKABLE void runHealthCheck();
     Q_INVOKABLE bool saveConfiguration(const QString &name,
                                        const QString &agentType,
@@ -84,6 +91,7 @@ public:
 signals:
     void activeSectionChanged();
     void currentProfileChanged();
+    void codexRoutesThroughLoomChanged();
     void dashboardChanged();
     void healthChecksChanged();
     void profilesChanged();
@@ -158,8 +166,11 @@ private:
         int hour = -1;
     };
 
+    HealthCheck buildHealthCheckForProfile(const Profile &profile, const QString &checkedAt) const;
     QVariantMap healthCheckToMap(const HealthCheck &check) const;
     bool applySelectedProfileToCodex();
+    bool applyProfileToCodex(const Profile &profile);
+    bool writeLoomProxyConfigurationToCodex(const Profile &profile, const QString &loomBaseUrl);
     void applyConfiguration(Profile &profile,
                             const QString &name,
                             const QString &agentType,
@@ -198,6 +209,7 @@ private:
     QVariantMap tokenTotalsToMap(const TokenTotals &totals) const;
     Profile *selectedProfile();
     const Profile *selectedProfile() const;
+    const Profile *activeProfile() const;
     void emitDataChanged();
     void setStatusMessage(const QString &message);
     bool writeProfileToDisk(Profile *profile, const QString &previousFolderName = QString());
@@ -214,6 +226,7 @@ private:
     qint64 m_tokenSelectedContextWindow = 0;
     int m_tokenTodaySessionCount = 0;
     bool m_tokenUsageLoaded = false;
+    bool m_codexRoutesThroughLoom = false;
     QString m_tokenLastUpdated;
     QString m_tokenSessionsPath;
     QString m_activeSection;
