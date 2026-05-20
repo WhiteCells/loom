@@ -80,7 +80,7 @@ QString jsonString(const QJsonObject &object, const QString &key, const QString 
     const QJsonValue value = object.value(key);
     return value.isString() ? value.toString() : fallback;
 }
-}
+} // namespace
 
 SettingsManager::SettingsManager(QObject *parent)
     : QObject(parent)
@@ -453,10 +453,7 @@ void SettingsManager::saveInterfaceConfig(const QString &profileName,
     const QString nextProfileName = profileName.trimmed();
     const QString nextProvider = nonEmptyString(modelProvider, QStringLiteral("OpenAI"));
     const QString nextModel = nonEmptyString(model, QStringLiteral("gpt-5.5"));
-    const QString nextEffort = validatedChoice(reasoningEffort.trimmed(), {QStringLiteral("low"),
-                                                                            QStringLiteral("medium"),
-                                                                            QStringLiteral("high"),
-                                                                            QStringLiteral("xhigh")},
+    const QString nextEffort = validatedChoice(reasoningEffort.trimmed(), {QStringLiteral("low"), QStringLiteral("medium"), QStringLiteral("high"), QStringLiteral("xhigh")},
                                                QStringLiteral("high"));
     const QString nextBaseUrl = baseUrl.trimmed();
     const QString nextHttpProxy = httpProxy.trimmed();

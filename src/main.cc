@@ -82,7 +82,7 @@ bool hasArgument(int argc, char *argv[], const QString &argument)
     }
     return false;
 }
-}
+} // namespace
 
 int main(int argc, char *argv[])
 {
@@ -125,24 +125,31 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty(QStringLiteral("proxyServer"), &proxyServer);
     engine.rootContext()->setContextProperty(QStringLiteral("settingsManager"), &settingsManager);
 
-    QObject::connect(&profileManager, &ProfileManager::activeSectionChanged, &settingsManager, [&profileManager, &settingsManager] {
-        if (settingsManager.restoreLastSection()) {
-            settingsManager.setLastSection(profileManager.activeSection());
-        }
-    }, Qt::QueuedConnection);
+    QObject::connect(
+        &profileManager,
+        &ProfileManager::activeSectionChanged,
+        &settingsManager,
+        [&profileManager, &settingsManager] {
+            if (settingsManager.restoreLastSection()) {
+                settingsManager.setLastSection(profileManager.activeSection());
+            }
+        },
+        Qt::QueuedConnection);
 
     QObject::connect(&settingsManager, &SettingsManager::codexRoutesThroughLoomChanged, &profileManager, [&profileManager, &settingsManager] {
         profileManager.setCodexRoutesThroughLoom(settingsManager.codexRoutesThroughLoom());
     });
 
-    QObject::connect(&profileManager, &ProfileManager::currentProfileChanged, &settingsManager, [&profileManager, &settingsManager] {
-        const QVariantMap profile = profileManager.currentProfile();
-        const QString folderName = profile.value(QStringLiteral("folderName")).toString();
-        settingsManager.setSelectedProfileFolder(folderName);
-        if (profile.value(QStringLiteral("active")).toBool()) {
-            settingsManager.setActiveProfileFolder(folderName);
-        }
-    }, Qt::QueuedConnection);
+    QObject::connect(
+        &profileManager, &ProfileManager::currentProfileChanged, &settingsManager, [&profileManager, &settingsManager] {
+            const QVariantMap profile = profileManager.currentProfile();
+            const QString folderName = profile.value(QStringLiteral("folderName")).toString();
+            settingsManager.setSelectedProfileFolder(folderName);
+            if (profile.value(QStringLiteral("active")).toBool()) {
+                settingsManager.setActiveProfileFolder(folderName);
+            }
+        },
+        Qt::QueuedConnection);
 
     QObject::connect(
         &engine,

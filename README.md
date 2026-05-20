@@ -431,3 +431,7 @@ CLI
 npm 安装
 
 alias
+
+```sh
+clang-format -i src/*.cc src/*.h
+```

@@ -23,16 +23,16 @@ namespace {
 QByteArray reasonPhrase(int statusCode)
 {
     switch (statusCode) {
-    case 200:
-        return "OK";
-    case 400:
-        return "Bad Request";
-    case 502:
-        return "Bad Gateway";
-    case 503:
-        return "Service Unavailable";
-    default:
-        return "Error";
+        case 200:
+            return "OK";
+        case 400:
+            return "Bad Request";
+        case 502:
+            return "Bad Gateway";
+        case 503:
+            return "Service Unavailable";
+        default:
+            return "Error";
     }
 }
 
@@ -40,22 +40,22 @@ bool isHopByHopHeader(const QByteArray &name)
 {
     const QByteArray lower = name.toLower();
     return lower == "connection"
-        || lower == "content-length"
-        || lower == "host"
-        || lower == "keep-alive"
-        || lower == "proxy-authenticate"
-        || lower == "proxy-authorization"
-        || lower == "te"
-        || lower == "trailer"
-        || lower == "transfer-encoding"
-        || lower == "upgrade";
+           || lower == "content-length"
+           || lower == "host"
+           || lower == "keep-alive"
+           || lower == "proxy-authenticate"
+           || lower == "proxy-authorization"
+           || lower == "te"
+           || lower == "trailer"
+           || lower == "transfer-encoding"
+           || lower == "upgrade";
 }
 
 bool isProxyManagedHeader(const QByteArray &name)
 {
     const QByteArray lower = name.toLower();
     return lower == "authorization"
-        || lower == "x-api-key";
+           || lower == "x-api-key";
 }
 
 QByteArray statusLine(int statusCode)
@@ -125,10 +125,10 @@ QString profileSignature(const QVariantMap &profile)
         profile.value(QStringLiteral("httpsProxy")).toString(),
         profile.value(QStringLiteral("disableResponseStorage")).toString(),
         profile.value(QStringLiteral("wireApi")).toString(),
-        profile.value(QStringLiteral("requiresOpenAiAuth")).toString()
-    }.join(QLatin1Char('\n'));
+        profile.value(QStringLiteral("requiresOpenAiAuth")).toString()}
+        .join(QLatin1Char('\n'));
 }
-}
+} // namespace
 
 class ProxyWorker : public QObject
 {
@@ -471,18 +471,23 @@ private:
             if (!m_pausedReplies.contains(reply)) {
                 reply->setReadBufferSize(kSocketWriteBufferLimit);
                 m_pausedReplies.insert(reply);
-                connect(pending->socket, &QTcpSocket::bytesWritten, reply, [this, reply](qint64) {
-                    PendingReply *pendingReply = m_pending.contains(reply) ? &m_pending[reply] : nullptr;
-                    if (!pendingReply || !pendingReply->socket) {
-                        m_pausedReplies.remove(reply);
-                        return;
-                    }
-                    if (pendingReply->socket->bytesToWrite() <= kSocketWriteBufferLimit / 2) {
-                        reply->setReadBufferSize(0);
-                        m_pausedReplies.remove(reply);
-                        drainReply(reply, pendingReply);
-                    }
-                }, Qt::SingleShotConnection);
+                connect(
+                    pending->socket,
+                    &QTcpSocket::bytesWritten,
+                    reply,
+                    [this, reply](qint64) {
+                        PendingReply *pendingReply = m_pending.contains(reply) ? &m_pending[reply] : nullptr;
+                        if (!pendingReply || !pendingReply->socket) {
+                            m_pausedReplies.remove(reply);
+                            return;
+                        }
+                        if (pendingReply->socket->bytesToWrite() <= kSocketWriteBufferLimit / 2) {
+                            reply->setReadBufferSize(0);
+                            m_pausedReplies.remove(reply);
+                            drainReply(reply, pendingReply);
+                        }
+                    },
+                    Qt::SingleShotConnection);
             }
             return;
         }

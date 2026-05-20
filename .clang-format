@@ -1,0 +1,67 @@
+BasedOnStyle: LLVM
+
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ContinuationIndentWidth: 4
+ConstructorInitializerIndentWidth: 4
+ColumnLimit: 0
+MaxEmptyLinesToKeep: 1
+Standard: Auto
+
+SpaceBeforeParens: ControlStatements
+SpaceBeforeCpp11BracedList: true
+PointerAlignment: Right
+ReferenceAlignment: Pointer
+DerivePointerAlignment: false
+AccessModifierOffset: -4
+IndentCaseLabels: true
+IndentPPDirectives: None
+NamespaceIndentation: None
+FixNamespaceComments: true
+CompactNamespaces: false
+
+AlignAfterOpenBracket: Align
+AlignOperands: Align
+AlignTrailingComments: true
+AlignConsecutiveMacros: true
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+BinPackArguments: true
+BinPackParameters: true
+AllowAllArgumentsOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLambdasOnASingleLine: None
+AllowShortLoopsOnASingleLine: false
+BreakBeforeTernaryOperators: true
+BreakBeforeBinaryOperators: NonAssignment
+BreakStringLiterals: true
+
+SortIncludes: false
+IncludeBlocks: Preserve
+SortUsingDeclarations: Never
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterStruct: true
+  AfterFunction: true
+  AfterControlStatement: false
+  AfterNamespace: false
+  BeforeElse: false
+  BeforeCatch: false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+
+BreakConstructorInitializers: BeforeComma
+PackConstructorInitializers: Never
+BreakInheritanceList: AfterColon
+
+AlwaysBreakAfterDefinitionReturnType: None
+BreakAfterReturnType: None
+BreakTemplateDeclarations: Yes

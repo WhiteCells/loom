@@ -381,7 +381,7 @@ QString displayRelativeDate(const QDate &date)
     }
     return date.toString(QStringLiteral("yyyy-MM-dd"));
 }
-}
+} // namespace
 
 ProfileManager::ProfileManager(QObject *parent)
     : QObject(parent)
@@ -520,14 +520,14 @@ QVariantMap ProfileManager::tokenSummary() const
 {
     QVariantMap map = tokenTotalsToMap(m_tokenSelectedTotals);
     map.insert(QStringLiteral("date"), m_tokenRangeStartDate == m_tokenRangeEndDate
-                                             ? m_tokenRangeStartDate.toString(QStringLiteral("yyyy-MM-dd"))
-                                             : QStringLiteral("%1 - %2")
-                                                   .arg(m_tokenRangeStartDate.toString(QStringLiteral("yyyy-MM-dd")),
-                                                        m_tokenRangeEndDate.toString(QStringLiteral("yyyy-MM-dd"))));
+                                           ? m_tokenRangeStartDate.toString(QStringLiteral("yyyy-MM-dd"))
+                                           : QStringLiteral("%1 - %2")
+                                                 .arg(m_tokenRangeStartDate.toString(QStringLiteral("yyyy-MM-dd")),
+                                                      m_tokenRangeEndDate.toString(QStringLiteral("yyyy-MM-dd"))));
     map.insert(QStringLiteral("dateLabel"), m_tokenRangeStartDate == m_tokenRangeEndDate
-                                                  ? displayRelativeDate(m_tokenRangeStartDate)
-                                                  : QStringLiteral("%1 days")
-                                                        .arg(m_tokenRangeStartDate.daysTo(m_tokenRangeEndDate) + 1));
+                                                ? displayRelativeDate(m_tokenRangeStartDate)
+                                                : QStringLiteral("%1 days")
+                                                      .arg(m_tokenRangeStartDate.daysTo(m_tokenRangeEndDate) + 1));
     map.insert(QStringLiteral("startDate"), m_tokenRangeStartDate.toString(QStringLiteral("yyyy-MM-dd")));
     map.insert(QStringLiteral("startDateLabel"), displayRelativeDate(m_tokenRangeStartDate));
     map.insert(QStringLiteral("endDate"), m_tokenRangeEndDate.toString(QStringLiteral("yyyy-MM-dd")));
@@ -1123,13 +1123,13 @@ bool ProfileManager::writeLoomProxyConfigurationToCodex(const Profile &profile, 
                                               {QStringLiteral("HTTP_PROXY"), profile.httpProxy.isEmpty() ? QString() : envValue(profile.httpProxy)},
                                               {QStringLiteral("HTTPS_PROXY"), profile.httpsProxy.isEmpty() ? QString() : envValue(profile.httpsProxy)}});
     const QString configContent = mergedLoomToml(readTextFile(configPath),
-                                                providerName,
-                                                baseUrl,
-                                                profile.model,
-                                                profile.reasoningEffort,
-                                                profile.disableResponseStorage,
-                                                profile.wireApi,
-                                                profile.requiresOpenAiAuth);
+                                                 providerName,
+                                                 baseUrl,
+                                                 profile.model,
+                                                 profile.reasoningEffort,
+                                                 profile.disableResponseStorage,
+                                                 profile.wireApi,
+                                                 profile.requiresOpenAiAuth);
 
     if (!writeTextFile(envPath, envContent)
         || !writeTextFile(configPath, configContent)) {
@@ -1210,10 +1210,10 @@ bool ProfileManager::isValidProfileName(const QString &name) const
 {
     const QString trimmed = name.trimmed();
     return !trimmed.isEmpty()
-        && !trimmed.contains(QLatin1Char('/'))
-        && !trimmed.contains(QLatin1Char('\\'))
-        && trimmed != QStringLiteral(".")
-        && trimmed != QStringLiteral("..");
+           && !trimmed.contains(QLatin1Char('/'))
+           && !trimmed.contains(QLatin1Char('\\'))
+           && trimmed != QStringLiteral(".")
+           && trimmed != QStringLiteral("..");
 }
 
 void ProfileManager::loadProfilesFromDisk()
@@ -1311,8 +1311,8 @@ bool ProfileManager::readProfileFromDirectory(const QString &folderName, Profile
     profile->monthlyLimit = 500000;
     profile->active = false;
     return QFileInfo::exists(dir.filePath(QStringLiteral(".env")))
-        || QFileInfo::exists(dir.filePath(QStringLiteral("config.toml")))
-        || QFileInfo::exists(dir.filePath(QStringLiteral("auth.json")));
+           || QFileInfo::exists(dir.filePath(QStringLiteral("config.toml")))
+           || QFileInfo::exists(dir.filePath(QStringLiteral("auth.json")));
 }
 
 void ProfileManager::loadTodayTokenUsage()
@@ -1442,9 +1442,9 @@ void ProfileManager::loadTokenUsage()
 }
 
 QVector<ProfileManager::TokenSession> ProfileManager::readTokenSessionsForDate(const QDate &date,
-                                                                                TokenTotals *totals,
-                                                                                qint64 *contextWindow,
-                                                                                QString *lastUpdated) const
+                                                                               TokenTotals *totals,
+                                                                               qint64 *contextWindow,
+                                                                               QString *lastUpdated) const
 {
     if (totals) {
         *totals = TokenTotals();
@@ -1604,8 +1604,7 @@ QVariantMap ProfileManager::tokenDayToMap(const TokenDay &day) const
     QVariantMap map;
     if (day.hour >= 0) {
         map.insert(QStringLiteral("date"),
-                   QStringLiteral("%1 %2:00").arg(day.date.toString(QStringLiteral("yyyy-MM-dd")),
-                                                   QStringLiteral("%1").arg(day.hour, 2, 10, QLatin1Char('0'))));
+                   QStringLiteral("%1 %2:00").arg(day.date.toString(QStringLiteral("yyyy-MM-dd")), QStringLiteral("%1").arg(day.hour, 2, 10, QLatin1Char('0'))));
         map.insert(QStringLiteral("label"), QStringLiteral("%1:00").arg(day.hour, 2, 10, QLatin1Char('0')));
     } else {
         map.insert(QStringLiteral("date"), day.date.toString(QStringLiteral("yyyy-MM-dd")));
