@@ -11,8 +11,8 @@ Item {
     property string iconName: ""
     property string tooltip: text
     property string variant: "secondary"
-    readonly property bool hovered: hoverHandler.hovered
-    readonly property bool down: tapHandler.pressed
+    readonly property bool hovered: hitArea.containsMouse
+    readonly property bool down: hitArea.pressed
     readonly property int contentGap: control.iconName.length > 0 && control.text.length > 0 ? 8 : 0
     readonly property int contentHorizontalInset: control.text.length > 0 ? 28 : 0
     readonly property int labelNaturalWidth: (control.iconName.length > 0 ? 16 : 0) + control.contentGap + (control.text.length > 0 ? Math.ceil(control.text.length * 7.8) : 0)
@@ -91,17 +91,28 @@ Item {
         }
     }
 
-    HoverHandler {
-        id: hoverHandler
-        enabled: control.enabled
-        cursorShape: control.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-    }
-
-    TapHandler {
-        id: tapHandler
+    MouseArea {
+        id: hitArea
+        anchors.fill: parent
         enabled: control.enabled
         acceptedButtons: Qt.LeftButton
-        onTapped: control.clicked()
+        hoverEnabled: true
+        preventStealing: true
+        propagateComposedEvents: false
+        cursorShape: control.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+
+        onPressed: function(mouse) {
+            mouse.accepted = true
+        }
+
+        onReleased: function(mouse) {
+            mouse.accepted = true
+        }
+
+        onClicked: function(mouse) {
+            mouse.accepted = true
+            control.clicked()
+        }
     }
 
     Behavior on scale {

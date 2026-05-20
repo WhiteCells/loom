@@ -874,15 +874,16 @@ Item {
 
         property var model: []
         property bool hourly: false
-        readonly property int labelCount: hourly ? 24 : Math.min(6, model.length || 0)
-        readonly property int labelWidth: hourly ? 28 : 48
-        readonly property int labelFontSize: hourly ? 9 : 10
+        readonly property int hourlyLabelStep: width >= 720 ? 4 : (width >= 460 ? 6 : 8)
+        readonly property int labelCount: hourly ? Math.floor(24 / hourlyLabelStep) + 1 : Math.min(6, model.length || 0)
+        readonly property int labelWidth: hourly ? 34 : 48
+        readonly property int labelFontSize: 10
         readonly property var labelModel: {
             var labels = []
             if (hourly) {
-                for (var hour = 0; hour < 24; ++hour) {
+                for (var hour = 0; hour <= 24; hour += hourlyLabelStep) {
                     labels.push({
-                        "position": hour / 23,
+                        "position": hour / 24,
                         "label": String(hour).padStart(2, "0")
                     })
                 }
@@ -912,6 +913,14 @@ Item {
                 maxValue = Math.max(maxValue, Number(model[i].tokens || 0))
             }
             return Math.max(1, maxValue)
+        }
+
+        function seriesPosition(index, count) {
+            if (hourly && count > 0) {
+                return (index + 0.5) / count
+            }
+
+            return count === 1 ? 0.5 : index / (count - 1)
         }
 
         Canvas {
@@ -948,20 +957,24 @@ Item {
 
                 var points = []
                 for (var i = 0; i < count; ++i) {
-                    var x = count === 1 ? width / 2 : left + (plotWidth * i / (count - 1))
+                    var x = left + plotWidth * chart.seriesPosition(i, count)
                     var value = Number(chart.model[i].tokens || 0)
                     var y = bottom - (value / chart.maxTokens) * plotHeight
                     points.push({ "x": x, "y": y, "value": value })
                 }
 
                 ctx.beginPath()
-                ctx.moveTo(points[0].x, bottom)
+                ctx.moveTo(chart.hourly ? left : points[0].x, bottom)
+                ctx.lineTo(points[0].x, bottom)
                 ctx.lineTo(points[0].x, points[0].y)
                 for (var p = 1; p < points.length; ++p) {
                     var midX = (points[p - 1].x + points[p].x) / 2
                     ctx.bezierCurveTo(midX, points[p - 1].y, midX, points[p].y, points[p].x, points[p].y)
                 }
                 ctx.lineTo(points[points.length - 1].x, bottom)
+                if (chart.hourly) {
+                    ctx.lineTo(right, bottom)
+                }
                 ctx.closePath()
                 ctx.fillStyle = Theme.accentSoft
                 ctx.fill()

@@ -769,7 +769,7 @@ Item {
         height: Math.max(460, Math.min(660, page.height - 72))
         x: Math.round((page.width - width) / 2)
         y: Math.round((page.height - height) / 2)
-        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        closePolicy: Popup.CloseOnEscape
 
         enter: Transition {
             NumberAnimation {
@@ -791,8 +791,8 @@ Item {
             }
         }
 
-        Overlay.modal: Rectangle {
-            color: Theme.overlay
+        Overlay.modal: BlockingModalOverlay {
+            onDismissed: profileEditor.close()
         }
 
         background: Rectangle {
@@ -1366,7 +1366,7 @@ Item {
         height: 236
         x: Math.round((page.width - width) / 2)
         y: Math.round((page.height - height) / 2)
-        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        closePolicy: Popup.CloseOnEscape
 
         enter: Transition {
             NumberAnimation {
@@ -1388,8 +1388,8 @@ Item {
             }
         }
 
-        Overlay.modal: Rectangle {
-            color: Theme.overlay
+        Overlay.modal: BlockingModalOverlay {
+            onDismissed: deleteConfirmDialog.close()
         }
 
         background: Rectangle {
@@ -1515,6 +1515,34 @@ Item {
                     variant: "danger"
                     onClicked: page.confirmDeleteSelectedProfile()
                 }
+            }
+        }
+    }
+
+    component BlockingModalOverlay: Rectangle {
+        id: modalOverlay
+
+        signal dismissed()
+
+        color: Theme.overlay
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.AllButtons
+            preventStealing: true
+            propagateComposedEvents: false
+
+            onPressed: function(mouse) {
+                mouse.accepted = true
+            }
+
+            onReleased: function(mouse) {
+                mouse.accepted = true
+            }
+
+            onClicked: function(mouse) {
+                mouse.accepted = true
+                modalOverlay.dismissed()
             }
         }
     }
