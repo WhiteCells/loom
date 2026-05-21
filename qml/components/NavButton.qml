@@ -12,10 +12,16 @@ Item {
     readonly property bool hovered: hoverHandler.hovered
     readonly property bool down: tapHandler.pressed
     readonly property int contentGap: control.iconName.length > 0 && control.text.length > 0 ? 8 : 0
-    readonly property int labelNaturalWidth: (control.iconName.length > 0 ? 16 : 0) + control.contentGap + Math.ceil(control.text.length * 7.8)
+
+    TextMetrics {
+        id: labelMetrics
+        text: control.text
+        font.pixelSize: 14
+        font.weight: Font.DemiBold
+    }
 
     implicitHeight: 40
-    implicitWidth: Math.max(116, control.labelNaturalWidth + 32)
+    implicitWidth: Math.max(116, Math.ceil(labelMetrics.advanceWidth) + 32 + (control.iconName.length > 0 ? 16 + control.contentGap : 0))
     opacity: control.enabled ? 1 : 0.64
     scale: 1.0
 

@@ -294,7 +294,7 @@ export OPENAI_API_KEY=xxx
 
 curl https://status.openai.com/api/v2/status.json
 
-curl https://api.jucode.cn/v1/models \
+curl https://cf.jucode.top/v1/models \
   -H "Authorization: Bearer $OPENAI_API_KEY"
 
 curl https://api.openai.com/v1/models \

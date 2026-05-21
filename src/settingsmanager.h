@@ -145,7 +145,6 @@ private:
     bool m_healthCheckOnActivate = false;
     bool m_loomProxyEnabled = false;
     int m_loomProxyPort = 14567;
-    bool m_codexRoutesThroughLoom = false;
     QString m_language = QStringLiteral("en");
     bool m_maskSecrets = true;
     bool m_keepBackups = true;

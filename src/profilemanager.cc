@@ -5,13 +5,19 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QHash>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QDateTime>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QList>
 #include <QSaveFile>
 #include <QStringList>
 #include <QTextStream>
+#include <QUrl>
 
 #include <algorithm>
 #include <numeric>
@@ -23,17 +29,72 @@ QString nowLabel()
     return QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss"));
 }
 
-QString healthEndpoint(const QString &baseUrl)
+QString normalizedProviderKey(const QString &provider, const QString &baseUrl)
+{
+    const QString normalizedProvider = provider.trimmed().toLower();
+    const QString normalizedEndpoint = baseUrl.trimmed().toLower();
+
+    if (normalizedProvider.contains(QStringLiteral("anthropic"))
+        || normalizedProvider.contains(QStringLiteral("claude"))
+        || normalizedEndpoint.contains(QStringLiteral("anthropic"))
+        || normalizedEndpoint.contains(QStringLiteral("claude"))) {
+        return QStringLiteral("anthropic");
+    }
+
+    if (normalizedProvider.contains(QStringLiteral("openai"))
+        || normalizedEndpoint.contains(QStringLiteral("openai"))
+        || normalizedEndpoint.contains(QStringLiteral("jucode"))) {
+        return QStringLiteral("openai");
+    }
+
+    return normalizedProvider.isEmpty() ? QStringLiteral("custom") : normalizedProvider;
+}
+
+QString providerLabel(const QString &providerKey, const QString &fallback)
+{
+    if (providerKey == QStringLiteral("openai")) {
+        return QStringLiteral("OpenAI");
+    }
+    if (providerKey == QStringLiteral("anthropic")) {
+        return QStringLiteral("Anthropic");
+    }
+
+    const QString trimmedFallback = fallback.trimmed();
+    return trimmedFallback.isEmpty() ? QStringLiteral("Custom") : trimmedFallback;
+}
+
+QString providerStatusEndpoint(const QString &providerKey)
+{
+    if (providerKey == QStringLiteral("openai")) {
+        return QStringLiteral("https://status.openai.com/api/v2/status.json");
+    }
+    if (providerKey == QStringLiteral("anthropic")) {
+        return QStringLiteral("https://status.claude.com/api/v2/status.json");
+    }
+
+    return QString();
+}
+
+QString modelOptionsEndpoint(const QString &baseUrl)
 {
     QString endpoint = baseUrl.trimmed();
     if (endpoint.isEmpty()) {
-        return QStringLiteral("Not configured");
+        return QString();
     }
 
     while (endpoint.endsWith(QLatin1Char('/'))) {
         endpoint.chop(1);
     }
-    return endpoint + QStringLiteral("/models");
+    if (!endpoint.endsWith(QStringLiteral("/models"))) {
+        endpoint += QStringLiteral("/models");
+    }
+    return endpoint;
+}
+
+QString healthDescription(const QString &description, const QString &fallback)
+{
+    const QString trimmed = description.trimmed();
+    return trimmed.isEmpty() ? fallback : trimmed;
 }
 
 QString tomlString(const QString &value)
@@ -347,6 +408,32 @@ qint64 jsonInteger(const QJsonObject &object, const QString &key)
     return 0;
 }
 
+QVariantList modelIdsFromJson(const QJsonDocument &document)
+{
+    QVariantList models;
+    QStringList seen;
+
+    const QJsonValue dataValue = document.object().value(QStringLiteral("data"));
+    const QJsonArray data = dataValue.isArray() ? dataValue.toArray() : document.array();
+    for (const QJsonValue &itemValue : data) {
+        QString id;
+        if (itemValue.isObject()) {
+            id = itemValue.toObject().value(QStringLiteral("id")).toString().trimmed();
+        } else if (itemValue.isString()) {
+            id = itemValue.toString().trimmed();
+        }
+
+        if (id.isEmpty() || seen.contains(id)) {
+            continue;
+        }
+
+        seen.append(id);
+        models.append(id);
+    }
+
+    return models;
+}
+
 QString displayDateTime(const QString &isoTimestamp)
 {
     QDateTime dateTime = QDateTime::fromString(isoTimestamp, Qt::ISODateWithMs);
@@ -385,7 +472,7 @@ QString displayRelativeDate(const QDate &date)
 
 ProfileManager::ProfileManager(QObject *parent)
     : QObject(parent)
-    , m_activeSection(QStringLiteral("Dashboard"))
+    , m_healthNetwork(new QNetworkAccessManager(this))
 {
     ensureProfileRoot();
     loadProfilesFromDisk();
@@ -401,21 +488,6 @@ ProfileManager::ProfileManager(QObject *parent)
         m_selectedProfileIndex = 0;
         setStatusMessage(QStringLiteral("Loaded %1 profiles").arg(m_profiles.size()));
     }
-}
-
-QString ProfileManager::activeSection() const
-{
-    return m_activeSection;
-}
-
-void ProfileManager::setActiveSection(const QString &section)
-{
-    if (m_activeSection == section) {
-        return;
-    }
-
-    m_activeSection = section;
-    emit activeSectionChanged();
 }
 
 QVariantMap ProfileManager::currentProfile() const
@@ -445,7 +517,10 @@ QVariantMap ProfileManager::dashboard() const
 
     const Profile *activeProfile = activeIt == m_profiles.cend() ? selectedProfile() : &(*activeIt);
     const int healthyCount = std::count_if(m_healthChecks.cbegin(), m_healthChecks.cend(), [](const HealthCheck &check) {
-        return check.status == QStringLiteral("OK");
+        return check.ok;
+    });
+    const bool hasPendingHealthChecks = std::any_of(m_healthChecks.cbegin(), m_healthChecks.cend(), [](const HealthCheck &check) {
+        return check.status == QStringLiteral("CHECKING");
     });
 
     result.insert(QStringLiteral("activeProfile"), activeProfile ? activeProfile->name : QStringLiteral("-"));
@@ -454,7 +529,9 @@ QVariantMap ProfileManager::dashboard() const
     result.insert(QStringLiteral("systemHealth"),
                   m_healthChecks.isEmpty()
                       ? QStringLiteral("No checks yet")
-                      : (healthyCount == m_healthChecks.size() ? QStringLiteral("All Systems Go") : QStringLiteral("Needs Attention")));
+                      : (hasPendingHealthChecks
+                             ? QStringLiteral("Checking")
+                             : (healthyCount == m_healthChecks.size() ? QStringLiteral("All Systems Go") : QStringLiteral("Needs Attention"))));
     result.insert(QStringLiteral("healthDetail"),
                   m_healthChecks.isEmpty()
                       ? QStringLiteral("No checks yet")
@@ -675,6 +752,7 @@ bool ProfileManager::createProfileWithConfiguration(const QString &name,
     m_profiles.append(profile);
     m_selectedProfileIndex = m_profiles.size() - 1;
 
+    invalidateHealthChecks();
     setStatusMessage(QStringLiteral("%1 created").arg(profile.name));
     emitDataChanged();
     emit selectedProfileIndexChanged();
@@ -707,6 +785,7 @@ void ProfileManager::deleteSelectedProfile()
         m_profiles[m_selectedProfileIndex].active = true;
     }
 
+    invalidateHealthChecks();
     setStatusMessage(removalWarning.isEmpty() ? QStringLiteral("%1 deleted").arg(removedName) : removalWarning);
     emit selectedProfileIndexChanged();
     emitDataChanged();
@@ -760,8 +839,74 @@ void ProfileManager::runHealthCheck()
     refreshHealthChecks();
 }
 
+void ProfileManager::loadModelOptions(const QString &baseUrl,
+                                      const QString &apiKey,
+                                      const QString &modelProvider)
+{
+    abortPendingModelOptions();
+
+    const QString endpoint = modelOptionsEndpoint(baseUrl);
+    const QString providerKey = normalizedProviderKey(modelProvider, baseUrl);
+    const QString provider = providerLabel(providerKey, modelProvider);
+    if (endpoint.isEmpty()) {
+        emit modelOptionsLoaded(baseUrl.trimmed(), provider, QVariantList(), QStringLiteral("Endpoint required before loading model options."));
+        return;
+    }
+
+    if (apiKey.trimmed().isEmpty()) {
+        emit modelOptionsLoaded(endpoint, provider, QVariantList(), QStringLiteral("API key required before loading model options."));
+        return;
+    }
+
+    QNetworkRequest request{QUrl(endpoint)};
+    request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("LoomDesktop/0.1"));
+    request.setRawHeader("Authorization", QStringLiteral("Bearer %1").arg(apiKey.trimmed()).toUtf8());
+    request.setTransferTimeout(8000);
+
+    m_pendingModelOptionsReply = m_healthNetwork->get(request);
+    QNetworkReply *reply = m_pendingModelOptionsReply;
+    connect(reply, &QNetworkReply::finished, this, [this, reply, endpoint, provider] {
+        if (!reply || reply != m_pendingModelOptionsReply) {
+            if (reply) {
+                reply->deleteLater();
+            }
+            return;
+        }
+
+        m_pendingModelOptionsReply = nullptr;
+
+        QVariantList models;
+        QString errorMessage;
+
+        if (reply->error() != QNetworkReply::NoError) {
+            errorMessage = reply->errorString();
+        } else {
+            QJsonParseError error;
+            const QJsonDocument document = QJsonDocument::fromJson(reply->readAll(), &error);
+            if (error.error != QJsonParseError::NoError) {
+                errorMessage = error.errorString();
+            } else {
+                models = modelIdsFromJson(document);
+                if (models.isEmpty()) {
+                    errorMessage = QStringLiteral("No model options found");
+                }
+            }
+        }
+
+        if (!errorMessage.isEmpty()) {
+            emit modelOptionsLoaded(endpoint, provider, QVariantList(), errorMessage);
+        } else {
+            emit modelOptionsLoaded(endpoint, provider, models, QString());
+        }
+
+        reply->deleteLater();
+    });
+}
+
 void ProfileManager::refreshHealthChecks()
 {
+    abortPendingHealthChecks();
+
     if (m_profiles.isEmpty()) {
         m_healthChecks.clear();
         setStatusMessage(QStringLiteral("Create a profile to begin"));
@@ -771,16 +916,93 @@ void ProfileManager::refreshHealthChecks()
     }
 
     const QString checkedAt = nowLabel();
-    QVector<HealthCheck> checks;
-    checks.reserve(m_profiles.size());
-    for (const Profile &existingProfile : std::as_const(m_profiles)) {
-        checks.append(buildHealthCheckForProfile(existingProfile, checkedAt));
+    m_pendingHealthCheckResults.clear();
+    m_pendingHealthCheckCount = m_profiles.size();
+    m_healthChecks.clear();
+    m_healthChecks.reserve(m_profiles.size());
+
+    for (int i = 0; i < m_profiles.size(); ++i) {
+        const Profile &existingProfile = m_profiles.at(i);
+        const HealthCheck pendingCheck = buildHealthCheckForProfile(existingProfile, checkedAt);
+        m_healthChecks.append(pendingCheck);
+
+        if (pendingCheck.endpoint.isEmpty()) {
+            m_pendingHealthCheckResults.insert(i, pendingCheck);
+            continue;
+        }
+
+        QNetworkRequest request{QUrl(pendingCheck.endpoint)};
+        request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("LoomDesktop/0.1"));
+        request.setTransferTimeout(5000);
+
+        QNetworkReply *reply = m_healthNetwork->get(request);
+        m_pendingHealthChecks.insert(reply,
+                                     {i,
+                                      pendingCheck.profileName,
+                                      pendingCheck.provider,
+                                      pendingCheck.endpoint,
+                                      pendingCheck.checkedAt,
+                                      QDateTime::currentMSecsSinceEpoch()});
+        connect(reply, &QNetworkReply::finished, this, [this, reply] {
+            const HealthCheckRequest request = m_pendingHealthChecks.take(reply);
+            if (request.index < 0) {
+                reply->deleteLater();
+                return;
+            }
+            HealthCheck check;
+            check.profileName = request.profileName;
+            check.provider = request.provider;
+            check.endpoint = request.endpoint;
+            check.checkedAt = request.checkedAt;
+            check.latencyMs = static_cast<int>(std::max<qint64>(0, QDateTime::currentMSecsSinceEpoch() - request.startedAtMs));
+
+            if (reply->error() != QNetworkReply::NoError) {
+                check.status = QStringLiteral("WARN");
+                check.indicator = QStringLiteral("error");
+                check.description = reply->errorString();
+                check.ok = false;
+            } else {
+                QJsonParseError error;
+                const QJsonDocument document = QJsonDocument::fromJson(reply->readAll(), &error);
+                const QJsonObject status = document.object().value(QStringLiteral("status")).toObject();
+                check.indicator = status.value(QStringLiteral("indicator")).toString(QStringLiteral("unknown"));
+                check.description = healthDescription(status.value(QStringLiteral("description")).toString(),
+                                                      QStringLiteral("No status description"));
+                check.ok = error.error == QJsonParseError::NoError && check.indicator == QStringLiteral("none");
+                check.status = check.ok ? QStringLiteral("OK") : QStringLiteral("WARN");
+
+                if (error.error != QJsonParseError::NoError) {
+                    check.indicator = QStringLiteral("invalid_json");
+                    check.description = error.errorString();
+                    check.ok = false;
+                    check.status = QStringLiteral("WARN");
+                }
+            }
+
+            if (request.index >= 0) {
+                m_pendingHealthCheckResults.insert(request.index, check);
+            }
+            reply->deleteLater();
+            finalizeHealthChecks();
+        });
     }
 
-    m_healthChecks = checks;
-    setStatusMessage(QStringLiteral("Health checks refreshed for %1 profiles").arg(m_healthChecks.size()));
+    setStatusMessage(QStringLiteral("Refreshing health checks for %1 profiles").arg(m_profiles.size()));
     emit healthChecksChanged();
     emit dashboardChanged();
+    finalizeHealthChecks();
+}
+
+void ProfileManager::abortPendingModelOptions()
+{
+    if (!m_pendingModelOptionsReply) {
+        return;
+    }
+
+    m_pendingModelOptionsReply->disconnect(this);
+    m_pendingModelOptionsReply->abort();
+    m_pendingModelOptionsReply->deleteLater();
+    m_pendingModelOptionsReply = nullptr;
 }
 
 bool ProfileManager::saveConfiguration(const QString &name,
@@ -840,6 +1062,7 @@ bool ProfileManager::saveConfiguration(const QString &name,
         return false;
     }
 
+    invalidateHealthChecks();
     setStatusMessage(QStringLiteral("%1 saved").arg(profile->name));
     emitDataChanged();
     return true;
@@ -934,14 +1157,6 @@ bool ProfileManager::setActiveProfileByFolderName(const QString &folderName)
     return true;
 }
 
-void ProfileManager::selectSection(const QString &section)
-{
-    if (section == QStringLiteral("Token Usage") && !m_tokenUsageLoaded) {
-        loadTokenUsage();
-    }
-    setActiveSection(section);
-}
-
 void ProfileManager::shiftTokenDate(int days)
 {
     if (!m_tokenSelectedDate.isValid()) {
@@ -1008,28 +1223,81 @@ QVariantMap ProfileManager::healthCheckToMap(const HealthCheck &check) const
 {
     QVariantMap map;
     map.insert(QStringLiteral("profile"), check.profileName);
-    map.insert(QStringLiteral("endpoint"), check.endpoint);
+    map.insert(QStringLiteral("provider"), check.provider);
+    map.insert(QStringLiteral("endpoint"), check.endpoint.isEmpty() ? QStringLiteral("Not supported") : check.endpoint);
     map.insert(QStringLiteral("status"), check.status);
+    map.insert(QStringLiteral("indicator"), check.indicator);
+    map.insert(QStringLiteral("description"), check.description);
     map.insert(QStringLiteral("latency"), check.latencyMs > 0 ? QStringLiteral("%1ms").arg(check.latencyMs) : QStringLiteral("N/A"));
     map.insert(QStringLiteral("latencyValue"), check.latencyMs);
     map.insert(QStringLiteral("checkedAt"), check.checkedAt);
+    map.insert(QStringLiteral("ok"), check.ok);
     return map;
 }
 
 ProfileManager::HealthCheck ProfileManager::buildHealthCheckForProfile(const Profile &profile, const QString &checkedAt) const
 {
-    const QString trimmedBaseUrl = profile.baseUrl.trimmed();
-    const bool hasEndpoint = !trimmedBaseUrl.isEmpty();
-    const bool hasModel = !profile.model.trimmed().isEmpty();
-    const bool hasApiKey = !profile.requiresOpenAiAuth || !profile.apiKey.trimmed().isEmpty();
-    const bool ok = hasEndpoint && hasModel && hasApiKey;
-    const uint signature = qHash(QStringLiteral("%1|%2|%3").arg(profile.folderName, trimmedBaseUrl, profile.model));
+    const QString providerKey = normalizedProviderKey(profile.modelProvider, profile.baseUrl);
+    const QString endpoint = providerStatusEndpoint(providerKey);
+    const QString provider = providerLabel(providerKey, profile.modelProvider);
+    if (endpoint.isEmpty()) {
+        return {profile.name,
+                provider,
+                QString(),
+                QStringLiteral("WARN"),
+                QStringLiteral("unsupported"),
+                QStringLiteral("No provider status endpoint configured"),
+                0,
+                checkedAt,
+                false};
+    }
 
     return {profile.name,
-            healthEndpoint(trimmedBaseUrl),
-            ok ? QStringLiteral("OK") : QStringLiteral("WARN"),
-            ok ? static_cast<int>(120 + signature % 360) : 0,
-            checkedAt};
+            provider,
+            endpoint,
+            QStringLiteral("CHECKING"),
+            QStringLiteral("pending"),
+            QStringLiteral("Checking provider status"),
+            0,
+            checkedAt,
+            false};
+}
+
+void ProfileManager::abortPendingHealthChecks()
+{
+    const QList<QNetworkReply *> replies = m_pendingHealthChecks.keys();
+    for (QNetworkReply *reply : replies) {
+        if (!reply) {
+            continue;
+        }
+        reply->disconnect(this);
+        reply->abort();
+        reply->deleteLater();
+    }
+
+    m_pendingHealthChecks.clear();
+    m_pendingHealthCheckResults.clear();
+    m_pendingHealthCheckCount = 0;
+}
+
+void ProfileManager::finalizeHealthChecks()
+{
+    if (m_pendingHealthCheckResults.size() < m_pendingHealthCheckCount || !m_pendingHealthChecks.isEmpty()) {
+        return;
+    }
+
+    QVector<HealthCheck> checks;
+    checks.reserve(m_pendingHealthCheckResults.size());
+    for (auto it = m_pendingHealthCheckResults.cbegin(); it != m_pendingHealthCheckResults.cend(); ++it) {
+        checks.append(it.value());
+    }
+
+    m_healthChecks = checks;
+    m_pendingHealthCheckResults.clear();
+    m_pendingHealthCheckCount = 0;
+    setStatusMessage(QStringLiteral("Health checks refreshed for %1 profiles").arg(m_healthChecks.size()));
+    emit healthChecksChanged();
+    emit dashboardChanged();
 }
 
 bool ProfileManager::applySelectedProfileToCodex()
@@ -1435,7 +1703,6 @@ void ProfileManager::loadTokenUsage()
                               : QStringLiteral("%1 - %2")
                                     .arg(sessionsRoot.filePath(m_tokenRangeStartDate.toString(QStringLiteral("yyyy/MM/dd"))),
                                          sessionsRoot.filePath(m_tokenRangeEndDate.toString(QStringLiteral("yyyy/MM/dd"))));
-    m_tokenUsageLoaded = true;
 
     emit tokenUsageChanged();
     emit dashboardChanged();
@@ -1687,7 +1954,17 @@ void ProfileManager::emitDataChanged()
     emit profilesChanged();
     emit currentProfileChanged();
     emit dashboardChanged();
-    emit tokenUsageChanged();
+}
+
+void ProfileManager::invalidateHealthChecks()
+{
+    abortPendingHealthChecks();
+    if (m_healthChecks.isEmpty()) {
+        return;
+    }
+
+    m_healthChecks.clear();
+    emit healthChecksChanged();
 }
 
 void ProfileManager::setStatusMessage(const QString &message)

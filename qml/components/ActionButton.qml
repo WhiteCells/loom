@@ -15,10 +15,16 @@ Item {
     readonly property bool down: hitArea.pressed
     readonly property int contentGap: control.iconName.length > 0 && control.text.length > 0 ? 8 : 0
     readonly property int contentHorizontalInset: control.text.length > 0 ? 28 : 0
-    readonly property int labelNaturalWidth: (control.iconName.length > 0 ? 16 : 0) + control.contentGap + (control.text.length > 0 ? Math.ceil(control.text.length * 7.8) : 0)
+
+    TextMetrics {
+        id: labelMetrics
+        text: control.text
+        font.pixelSize: 13
+        font.weight: Font.DemiBold
+    }
 
     implicitHeight: 36
-    implicitWidth: control.text.length > 0 ? Math.max(96, control.labelNaturalWidth + control.contentHorizontalInset) : implicitHeight
+    implicitWidth: control.text.length > 0 ? Math.max(96, Math.ceil(labelMetrics.advanceWidth) + control.contentHorizontalInset + (iconSlot.visible ? iconSlot.width + control.contentGap : 0)) : implicitHeight
     opacity: control.enabled ? 1 : 0.64
     scale: control.down && control.enabled ? 0.98 : 1.0
 

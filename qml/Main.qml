@@ -8,18 +8,38 @@ ApplicationWindow {
 
     readonly property int outerMargin: 12
     readonly property int pagePadding: 22
-    readonly property int currentPageIndex: {
-        switch (profileManager.activeSection) {
-        case "Profiles":
-            return 1
-        case "Health Checks":
-            return 2
-        case "Token Usage":
-            return 3
-        case "Settings":
-            return 4
-        default:
-            return 0
+    property string activeSection: "Dashboard"
+    readonly property var navigationItems: [
+        { section: "Dashboard", label: "Dashboard", icon: "layout-dashboard" },
+        { section: "Profiles", label: "Profiles", icon: "users-round" },
+        { section: "Health Checks", label: "Health Checks", icon: "activity" },
+        { section: "Token Usage", label: "Token Usage", icon: "chart-no-axes-column" },
+        { section: "Settings", label: "Settings", icon: "settings" }
+    ]
+    readonly property int currentPageIndex: root.pageIndexForSection(root.activeSection)
+
+    function pageIndexForSection(section) {
+        for (var i = 0; i < root.navigationItems.length; ++i) {
+            if (root.navigationItems[i].section === section) {
+                return i
+            }
+        }
+        return 0
+    }
+
+    function activateSection(section) {
+        var nextSection = section && section.length > 0 ? section : "Dashboard"
+        if (root.activeSection === nextSection) {
+            if (nextSection === "Token Usage") {
+                profileManager.refreshTokenUsage()
+            }
+            return
+        }
+
+        root.activeSection = nextSection
+        settingsManager.lastSection = nextSection
+        if (nextSection === "Token Usage") {
+            profileManager.refreshTokenUsage()
         }
     }
     width: 1280
@@ -36,20 +56,22 @@ ApplicationWindow {
         value: settingsManager.language
     }
 
-    Component.onCompleted: {
-        Theme.dark = settingsManager.darkTheme
-        Theme.accentIndex = settingsManager.accentIndex
+    Binding {
+        target: Theme
+        property: "dark"
+        value: settingsManager.darkTheme
     }
 
-    Connections {
-        target: settingsManager
+    Binding {
+        target: Theme
+        property: "accentIndex"
+        value: settingsManager.accentIndex
+    }
 
-        function onDarkThemeChanged() {
-            Theme.dark = settingsManager.darkTheme
-        }
-
-        function onAccentIndexChanged() {
-            Theme.accentIndex = settingsManager.accentIndex
+    Component.onCompleted: {
+        root.activeSection = settingsManager.restoreLastSection ? settingsManager.lastSection : "Dashboard"
+        if (root.activeSection === "Token Usage") {
+            profileManager.refreshTokenUsage()
         }
     }
 
@@ -114,39 +136,16 @@ ApplicationWindow {
                             }
                         }
 
-                        NavButton {
-                            text: I18n.t("Dashboard")
-                            iconName: "layout-dashboard"
-                            active: profileManager.activeSection === "Dashboard"
-                            onClicked: profileManager.selectSection("Dashboard")
-                        }
+                        Repeater {
+                            model: root.navigationItems
 
-                        NavButton {
-                            text: I18n.t("Profiles")
-                            iconName: "users-round"
-                            active: profileManager.activeSection === "Profiles"
-                            onClicked: profileManager.selectSection("Profiles")
-                        }
-
-                        NavButton {
-                            text: I18n.t("Health Checks")
-                            iconName: "activity"
-                            active: profileManager.activeSection === "Health Checks"
-                            onClicked: profileManager.selectSection("Health Checks")
-                        }
-
-                        NavButton {
-                            text: I18n.t("Token Usage")
-                            iconName: "chart-no-axes-column"
-                            active: profileManager.activeSection === "Token Usage"
-                            onClicked: profileManager.selectSection("Token Usage")
-                        }
-
-                        NavButton {
-                            text: I18n.t("Settings")
-                            iconName: "settings"
-                            active: profileManager.activeSection === "Settings"
-                            onClicked: profileManager.selectSection("Settings")
+                            NavButton {
+                                required property var modelData
+                                text: I18n.t(modelData.label)
+                                iconName: modelData.icon
+                                active: root.activeSection === modelData.section
+                                onClicked: root.activateSection(modelData.section)
+                            }
                         }
                     }
                 }

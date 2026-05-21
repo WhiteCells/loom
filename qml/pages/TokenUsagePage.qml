@@ -26,12 +26,6 @@ Item {
         return dateToString(date)
     }
 
-    Component.onCompleted: {
-        if (profileManager.activeSection === "Token Usage") {
-            profileManager.refreshTokenUsage()
-        }
-    }
-
     PageFrame {
         anchors.fill: parent
         padding: 22

@@ -213,20 +213,13 @@ bool SettingsManager::loomProxyEnabled() const
 
 void SettingsManager::setLoomProxyEnabled(bool loomProxyEnabled)
 {
-    const bool proxyChanged = m_loomProxyEnabled != loomProxyEnabled;
-    const bool routesChanged = m_codexRoutesThroughLoom != loomProxyEnabled;
-    if (!proxyChanged && !routesChanged) {
+    if (m_loomProxyEnabled == loomProxyEnabled) {
         return;
     }
 
     m_loomProxyEnabled = loomProxyEnabled;
-    m_codexRoutesThroughLoom = loomProxyEnabled;
-    if (proxyChanged) {
-        emit loomProxyEnabledChanged();
-    }
-    if (routesChanged) {
-        emit codexRoutesThroughLoomChanged();
-    }
+    emit loomProxyEnabledChanged();
+    emit codexRoutesThroughLoomChanged();
     emit valuesChanged();
     persistAfterChange();
 }
@@ -256,7 +249,7 @@ QString SettingsManager::loomProxyUrl() const
 
 bool SettingsManager::codexRoutesThroughLoom() const
 {
-    return m_codexRoutesThroughLoom;
+    return m_loomProxyEnabled;
 }
 
 void SettingsManager::setCodexRoutesThroughLoom(bool codexRoutesThroughLoom)
@@ -580,9 +573,10 @@ bool SettingsManager::loadFromDisk(bool announce)
     m_restoreLastSection = jsonBool(behavior, QStringLiteral("restoreLastSection"), m_restoreLastSection);
     m_healthCheckOnActivate = jsonBool(behavior, QStringLiteral("healthCheckOnActivate"), m_healthCheckOnActivate);
     const QJsonObject proxy = root.value(QStringLiteral("proxy")).toObject();
-    m_loomProxyEnabled = jsonBool(proxy, QStringLiteral("enabled"), m_loomProxyEnabled);
+    m_loomProxyEnabled = jsonBool(proxy,
+                                  QStringLiteral("enabled"),
+                                  jsonBool(proxy, QStringLiteral("codexRoutesThroughLoom"), m_loomProxyEnabled));
     m_loomProxyPort = boundedPort(jsonInt(proxy, QStringLiteral("port"), m_loomProxyPort));
-    m_codexRoutesThroughLoom = m_loomProxyEnabled;
     m_lastSection = validatedChoice(jsonString(behavior, QStringLiteral("lastSection"), m_lastSection), sections(), QStringLiteral("Dashboard"));
 
     m_selectedProfileFolder = jsonString(profiles, QStringLiteral("selectedProfileFolder"), m_selectedProfileFolder).trimmed();
@@ -652,7 +646,7 @@ QJsonObject SettingsManager::toJsonObject(bool includeUpdatedAt) const
     proxy.insert(QStringLiteral("enabled"), m_loomProxyEnabled);
     proxy.insert(QStringLiteral("port"), m_loomProxyPort);
     proxy.insert(QStringLiteral("url"), loomProxyUrl());
-    proxy.insert(QStringLiteral("codexRoutesThroughLoom"), m_codexRoutesThroughLoom);
+    proxy.insert(QStringLiteral("codexRoutesThroughLoom"), m_loomProxyEnabled);
 
     QJsonObject profiles;
     profiles.insert(QStringLiteral("selectedProfileFolder"), m_selectedProfileFolder);

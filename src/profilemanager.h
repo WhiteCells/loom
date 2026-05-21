@@ -4,15 +4,19 @@
 #include <QDate>
 #include <QDir>
 #include <QJsonObject>
+#include <QHash>
+#include <QMap>
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
 #include <QVector>
 
+class QNetworkAccessManager;
+class QNetworkReply;
+
 class ProfileManager : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QString activeSection READ activeSection WRITE setActiveSection NOTIFY activeSectionChanged)
     Q_PROPERTY(QVariantMap currentProfile READ currentProfile NOTIFY currentProfileChanged)
     Q_PROPERTY(QVariantMap dashboard READ dashboard NOTIFY dashboardChanged)
     Q_PROPERTY(QVariantList healthChecks READ healthChecks NOTIFY healthChecksChanged)
@@ -27,9 +31,6 @@ class ProfileManager : public QObject
 
 public:
     explicit ProfileManager(QObject *parent = nullptr);
-
-    QString activeSection() const;
-    void setActiveSection(const QString &section);
 
     QVariantMap currentProfile() const;
     QVariantMap dashboard() const;
@@ -65,6 +66,9 @@ public:
     Q_INVOKABLE bool applyLoomProxyToCodex(const QString &loomBaseUrl);
     Q_INVOKABLE void refreshHealthChecks();
     Q_INVOKABLE void runHealthCheck();
+    Q_INVOKABLE void loadModelOptions(const QString &baseUrl,
+                                      const QString &apiKey,
+                                      const QString &modelProvider);
     Q_INVOKABLE bool saveConfiguration(const QString &name,
                                        const QString &agentType,
                                        const QString &modelProvider,
@@ -80,7 +84,6 @@ public:
     Q_INVOKABLE void selectProfile(int index);
     Q_INVOKABLE bool selectProfileByFolderName(const QString &folderName);
     Q_INVOKABLE bool setActiveProfileByFolderName(const QString &folderName);
-    Q_INVOKABLE void selectSection(const QString &section);
     Q_INVOKABLE void shiftTokenDate(int days);
     Q_INVOKABLE void shiftTokenRangeStart(int days);
     Q_INVOKABLE void shiftTokenRangeEnd(int days);
@@ -89,7 +92,6 @@ public:
     Q_INVOKABLE void refreshTokenUsage();
 
 signals:
-    void activeSectionChanged();
     void currentProfileChanged();
     void codexRoutesThroughLoomChanged();
     void dashboardChanged();
@@ -98,6 +100,10 @@ signals:
     void selectedProfileIndexChanged();
     void statusMessageChanged();
     void tokenUsageChanged();
+    void modelOptionsLoaded(const QString &baseUrl,
+                            const QString &modelProvider,
+                            const QVariantList &models,
+                            const QString &errorMessage);
 
 private:
     struct Profile
@@ -124,10 +130,24 @@ private:
     struct HealthCheck
     {
         QString profileName;
+        QString provider;
         QString endpoint;
         QString status;
+        QString indicator;
+        QString description;
         int latencyMs = 0;
         QString checkedAt;
+        bool ok = false;
+    };
+
+    struct HealthCheckRequest
+    {
+        int index = -1;
+        QString profileName;
+        QString provider;
+        QString endpoint;
+        QString checkedAt;
+        qint64 startedAtMs = 0;
     };
 
     struct TokenTotals
@@ -168,6 +188,10 @@ private:
 
     HealthCheck buildHealthCheckForProfile(const Profile &profile, const QString &checkedAt) const;
     QVariantMap healthCheckToMap(const HealthCheck &check) const;
+    void abortPendingHealthChecks();
+    void abortPendingModelOptions();
+    void invalidateHealthChecks();
+    void finalizeHealthChecks();
     bool applySelectedProfileToCodex();
     bool applyProfileToCodex(const Profile &profile);
     bool writeLoomProxyConfigurationToCodex(const Profile &profile, const QString &loomBaseUrl);
@@ -216,6 +240,11 @@ private:
 
     QVector<Profile> m_profiles;
     QVector<HealthCheck> m_healthChecks;
+    QHash<QNetworkReply *, HealthCheckRequest> m_pendingHealthChecks;
+    QMap<int, HealthCheck> m_pendingHealthCheckResults;
+    QNetworkAccessManager *m_healthNetwork = nullptr;
+    QNetworkReply *m_pendingModelOptionsReply = nullptr;
+    int m_pendingHealthCheckCount = 0;
     QVector<TokenDay> m_tokenDailySeries;
     QVector<TokenSession> m_tokenSessions;
     QDate m_tokenSelectedDate;
@@ -225,11 +254,9 @@ private:
     TokenTotals m_tokenTodayTotals;
     qint64 m_tokenSelectedContextWindow = 0;
     int m_tokenTodaySessionCount = 0;
-    bool m_tokenUsageLoaded = false;
     bool m_codexRoutesThroughLoom = false;
     QString m_tokenLastUpdated;
     QString m_tokenSessionsPath;
-    QString m_activeSection;
     int m_selectedProfileIndex = -1;
     QString m_statusMessage;
 };

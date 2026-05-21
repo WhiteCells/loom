@@ -17,7 +17,7 @@ Item {
     readonly property var languageNames: ["English", "Chinese"]
     readonly property var accentColors: [Theme.accentBlue, Theme.accentGreen, Theme.accentAmber, Theme.accentSky, Theme.accentMint, Theme.accentPeach]
     readonly property var accentNames: ["Blue", "Green", "Amber", "Sky", "Mint", "Peach"]
-    readonly property bool codexRoutedThroughLoom: settingsManager.loomProxyEnabled && settingsManager.codexRoutesThroughLoom
+    readonly property bool codexRoutedThroughLoom: settingsManager.codexRoutesThroughLoom
 
     function displayMessage() {
         if (settingsMessage.length > 0) {

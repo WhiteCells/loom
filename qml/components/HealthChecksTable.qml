@@ -23,6 +23,7 @@ Item {
     readonly property int tableCheckedAtWidth: compactTable ? 0 : 126
     readonly property int tableStatusWidth: 112
     readonly property int tableLatencyWidth: 86
+    readonly property int tableIndicatorWidth: compactTable ? 0 : 110
     readonly property int rowCount: root.model && root.model.length !== undefined ? root.model.length : 0
 
     ColumnLayout {
@@ -73,6 +74,17 @@ Item {
                     font.weight: Font.DemiBold
                     Layout.preferredWidth: root.tableCheckedAtWidth
                     Layout.minimumWidth: root.compactTable ? 0 : 112
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                Text {
+                    visible: !root.compactTable
+                    text: I18n.t("Indicator")
+                    color: Theme.dim
+                    font.pixelSize: 11
+                    font.weight: Font.DemiBold
+                    Layout.preferredWidth: root.tableIndicatorWidth
+                    Layout.minimumWidth: 92
                     verticalAlignment: Text.AlignVCenter
                 }
 
@@ -142,9 +154,11 @@ Item {
                     width: ListView.view ? ListView.view.width : root.width
                     height: root.tableRowHeight
                     readonly property bool hovered: rowHover.hovered
-                    readonly property bool ok: tableRow.modelData.status === "OK"
-                    readonly property color statusColor: ok ? Theme.success : Theme.warning
-                    readonly property color statusFill: ok ? Theme.successSoft : Theme.warningSoft
+                    readonly property bool ok: tableRow.modelData.ok === true || tableRow.modelData.status === "OK"
+                    readonly property bool checking: tableRow.modelData.status === "CHECKING"
+                    readonly property string statusText: checking ? "Checking" : tableRow.modelData.status
+                    readonly property color statusColor: checking ? Theme.accent : (ok ? Theme.success : Theme.warning)
+                    readonly property color statusFill: checking ? Theme.accentSoft : (ok ? Theme.successSoft : Theme.warningSoft)
 
                     Rectangle {
                         anchors.fill: parent
@@ -179,7 +193,7 @@ Item {
                         }
 
                         Text {
-                            text: tableRow.modelData.endpoint
+                            text: I18n.status(tableRow.modelData.endpoint)
                             color: Theme.muted
                             font.pixelSize: 13
                             Layout.fillWidth: true
@@ -199,18 +213,37 @@ Item {
                             verticalAlignment: Text.AlignVCenter
                         }
 
+                        Text {
+                            visible: !root.compactTable
+                            text: I18n.status(tableRow.modelData.indicator || "-")
+                            color: Theme.muted
+                            font.pixelSize: 13
+                            Layout.preferredWidth: root.tableIndicatorWidth
+                            Layout.minimumWidth: 92
+                            verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
+                        }
+
                         Item {
                             Layout.preferredWidth: root.tableStatusWidth
                             Layout.minimumWidth: 96
 
                             Pill {
-                                text: tableRow.modelData.status
-                                iconName: tableRow.ok ? "check" : "triangle-alert"
+                                text: I18n.status(tableRow.statusText)
+                                iconName: tableRow.checking ? "refresh-cw" : (tableRow.ok ? "check" : "triangle-alert")
                                 fill: tableRow.statusFill
                                 foreground: tableRow.statusColor
                                 horizontalPadding: 11
                                 anchors.verticalCenter: parent.verticalCenter
                             }
+
+                            HoverHandler {
+                                id: statusHover
+                            }
+
+                            ToolTip.visible: statusHover.hovered && tableRow.modelData.description && tableRow.modelData.description.length > 0
+                            ToolTip.delay: 450
+                            ToolTip.text: I18n.status(tableRow.modelData.description)
                         }
 
                         Text {

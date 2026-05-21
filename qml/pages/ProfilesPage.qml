@@ -15,20 +15,23 @@ Item {
     property bool deleteClosesEditor: false
     property string deleteProfileName: ""
     property string editorWarning: ""
-    property var editorModelOptions: ["gpt-5.5", "gpt-5.4", "gpt-5.3-codex"]
+    property var editorModelOptions: []
     property var visibleProfiles: []
+    property bool editorModelOptionsLoading: false
     property bool editorModelOptionsReady: false
+    property string editorPreferredModel: ""
+    property string editorModelRequestEndpoint: ""
     property string editorModelMessageKey: "Enter an endpoint to load model options."
     property string editorModelMessageProvider: ""
+    property string editorModelError: ""
     readonly property string editorModelMessage: editorModelMessageKey === "%1 model options loaded"
             ? I18n.arg(I18n.t(editorModelMessageKey), editorModelMessageProvider)
+            : editorModelMessageKey === "Failed to load model options: %1"
+            ? I18n.arg(I18n.t(editorModelMessageKey), I18n.status(editorModelError))
             : I18n.t(editorModelMessageKey)
     readonly property var providers: ["OpenAI", "Anthropic", "Custom"]
     readonly property var efforts: ["low", "medium", "high", "xhigh"]
     readonly property var wireApis: ["responses", "chat"]
-    readonly property var openAiModels: ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.2"]
-    readonly property var anthropicModels: ["claude-sonnet-4.5", "claude-opus-4.1", "claude-haiku-4.5"]
-    readonly property var customModels: ["custom-model"]
     readonly property int previewLineCount: Math.max(page.configLines(profileManager.currentProfile).length,
                                                      page.authLines(profileManager.currentProfile).length,
                                                      page.envLines(profileManager.currentProfile).length)
@@ -133,12 +136,23 @@ Item {
         return (endpoint || "").trim()
     }
 
+    function modelOptionsEndpoint(endpoint) {
+        var value = page.cleanEndpoint(endpoint)
+        while (value.length > 0 && value.charAt(value.length - 1) === "/") {
+            value = value.substring(0, value.length - 1)
+        }
+        if (value.length > 0 && value.toLowerCase().substring(value.length - 7) !== "/models") {
+            value += "/models"
+        }
+        return value
+    }
+
     function providerForEndpoint(endpoint, fallbackProvider) {
         var normalized = page.cleanEndpoint(endpoint).toLowerCase()
         if (normalized.indexOf("anthropic") !== -1) {
             return "Anthropic"
         }
-        if (normalized.indexOf("openai") !== -1) {
+        if (normalized.indexOf("openai") !== -1 || normalized.indexOf("jucode") !== -1) {
             return "OpenAI"
         }
         return fallbackProvider && fallbackProvider.length > 0 ? fallbackProvider : "Custom"
@@ -148,51 +162,66 @@ Item {
         return provider === "Anthropic" ? "Claude" : "Codex"
     }
 
-    function modelOptionsForProvider(provider, preferredModel) {
-        var result = page.customModels.slice()
-        if (provider === "Anthropic") {
-            result = page.anthropicModels.slice()
-        } else if (provider === "OpenAI") {
-            result = page.openAiModels.slice()
-        } else if (preferredModel && preferredModel.trim().length > 0) {
-            result = [preferredModel.trim()]
-        }
-
-        var preferred = preferredModel ? preferredModel.trim() : ""
-        if (preferred.length > 0 && result.indexOf(preferred) === -1) {
-            result.unshift(preferred)
-        }
-        return result
-    }
-
-    function refreshEditorModelOptions(preferredModel) {
+    function loadEditorModelOptions(preferredModel) {
         var endpoint = page.cleanEndpoint(editorBaseUrlField.text)
+        page.editorPreferredModel = preferredModel ? preferredModel.trim() : ""
+        page.editorModelRequestEndpoint = ""
+        page.editorModelError = ""
         if (endpoint.length === 0) {
             page.editorModelOptions = []
             editorModelBox.currentIndex = -1
+            page.editorModelOptionsLoading = false
+            page.editorModelOptionsReady = false
             page.editorModelMessageProvider = ""
             page.editorModelMessageKey = "Endpoint required before loading model options."
+            return
+        }
+        if (editorApiKeyField.text.trim().length === 0) {
+            page.editorModelOptions = []
+            editorModelBox.currentIndex = -1
+            page.editorModelOptionsLoading = false
+            page.editorModelOptionsReady = false
+            page.editorModelMessageProvider = ""
+            page.editorModelMessageKey = "API key required before loading model options."
             return
         }
 
         var provider = page.providerForEndpoint(endpoint, editorProviderBox.currentText)
         editorProviderBox.currentIndex = page.indexFor(page.providers, provider)
-
-        var options = page.modelOptionsForProvider(provider, preferredModel || "")
-        var target = preferredModel && preferredModel.trim().length > 0 ? preferredModel.trim() : options[0]
-        page.editorModelOptions = options
-        editorModelBox.currentIndex = page.indexFor(options, target)
-        page.editorModelOptionsReady = true
+        page.editorModelOptions = []
+        editorModelBox.currentIndex = -1
+        page.editorModelRequestEndpoint = page.modelOptionsEndpoint(endpoint)
         page.editorModelMessageProvider = provider
-        page.editorModelMessageKey = "%1 model options loaded"
+        page.editorModelOptionsLoading = true
+        page.editorModelOptionsReady = false
+        page.editorModelMessageKey = "Loading model options..."
+        profileManager.loadModelOptions(endpoint, editorApiKeyField.text, provider)
     }
 
     function markEndpointChanged() {
+        page.editorModelOptions = []
+        editorModelBox.currentIndex = -1
+        page.editorModelRequestEndpoint = ""
+        page.editorModelOptionsLoading = false
         page.editorModelOptionsReady = false
+        page.editorModelError = ""
         page.editorModelMessageProvider = ""
         page.editorModelMessageKey = page.cleanEndpoint(editorBaseUrlField.text).length === 0
                 ? "Endpoint required before loading model options."
                 : "Endpoint changed. Load options before choosing a model."
+    }
+
+    function markApiKeyChanged() {
+        page.editorModelOptions = []
+        editorModelBox.currentIndex = -1
+        page.editorModelRequestEndpoint = ""
+        page.editorModelOptionsLoading = false
+        page.editorModelOptionsReady = false
+        page.editorModelError = ""
+        page.editorModelMessageProvider = ""
+        page.editorModelMessageKey = editorApiKeyField.text.trim().length === 0
+                ? "API key required before loading model options."
+                : "API key changed. Load options before choosing a model."
     }
 
     function saveCurrentInterfaceConfig() {
@@ -224,7 +253,11 @@ Item {
             editorOpenAiAuthSwitch.checked = true
             page.editorModelOptions = []
             editorModelBox.currentIndex = -1
+            page.editorModelOptionsLoading = false
             page.editorModelOptionsReady = false
+            page.editorPreferredModel = ""
+            page.editorModelRequestEndpoint = ""
+            page.editorModelError = ""
             page.editorModelMessageProvider = ""
             page.editorModelMessageKey = "Endpoint required before loading model options."
             editorEffortBox.currentIndex = -1
@@ -242,7 +275,7 @@ Item {
         editorStorageSwitch.checked = profile.disableResponseStorage !== false
         editorWireApiBox.currentIndex = page.indexFor(page.wireApis, profile.wireApi || "responses")
         editorOpenAiAuthSwitch.checked = profile.requiresOpenAiAuth !== false
-        page.refreshEditorModelOptions(profile.model || "")
+        page.loadEditorModelOptions(profile.model || "")
         editorEffortBox.currentIndex = page.indexFor(page.efforts, profile.reasoningEffort || "high")
     }
 
@@ -343,6 +376,40 @@ Item {
 
         function onProfilesChanged() {
             page.refreshVisibleProfiles()
+        }
+
+        function onModelOptionsLoaded(baseUrl, modelProvider, models, errorMessage) {
+            if (page.editorModelRequestEndpoint.length === 0 || baseUrl !== page.editorModelRequestEndpoint) {
+                return
+            }
+
+            page.editorModelRequestEndpoint = ""
+            page.editorModelOptionsLoading = false
+            page.editorModelMessageProvider = page.providerForEndpoint(baseUrl, modelProvider)
+            page.editorModelError = errorMessage || ""
+
+            if (errorMessage && errorMessage.length > 0) {
+                page.editorModelOptions = []
+                editorModelBox.currentIndex = -1
+                page.editorModelOptionsReady = false
+                page.editorModelMessageKey = "Failed to load model options: %1"
+                return
+            }
+
+            var options = []
+            for (var i = 0; i < models.length; ++i) {
+                options.push(String(models[i]))
+            }
+
+            var target = page.editorPreferredModel.length > 0 ? page.editorPreferredModel : (options.length > 0 ? options[0] : "")
+            if (target.length > 0 && options.indexOf(target) === -1) {
+                options.unshift(target)
+            }
+
+            page.editorModelOptions = options
+            editorModelBox.currentIndex = target.length > 0 ? page.indexFor(options, target) : -1
+            page.editorModelOptionsReady = options.length > 0
+            page.editorModelMessageKey = "%1 model options loaded"
         }
     }
 
@@ -949,7 +1016,7 @@ Item {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 40
                                 model: page.providers
-                                onActivated: page.refreshEditorModelOptions("")
+                                onActivated: page.loadEditorModelOptions("")
                             }
                         }
                     }
@@ -1144,6 +1211,7 @@ Item {
                                 Layout.preferredHeight: 40
                                 secret: true
                                 placeholderText: "sk-..."
+                                onTextEdited: page.markApiKeyChanged()
                             }
                         }
                     }
@@ -1176,11 +1244,11 @@ Item {
                         }
 
                         ActionButton {
-                            text: I18n.t("Load from Endpoint")
+                            text: page.editorModelOptionsLoading ? I18n.t("Loading") : I18n.t("Load from Endpoint")
                             iconName: "refresh-cw"
-                            enabled: page.cleanEndpoint(editorBaseUrlField.text).length > 0
+                            enabled: !page.editorModelOptionsLoading && page.cleanEndpoint(editorBaseUrlField.text).length > 0
                             Layout.alignment: Qt.AlignVCenter
-                            onClicked: page.refreshEditorModelOptions("")
+                            onClicked: page.loadEditorModelOptions("")
                         }
                     }
 
@@ -1208,7 +1276,7 @@ Item {
                                 id: editorModelBox
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 40
-                                enabled: page.editorModelOptionsReady
+                                enabled: page.editorModelOptionsReady && !page.editorModelOptionsLoading
                                 model: page.editorModelOptions
                             }
                         }
@@ -1229,7 +1297,7 @@ Item {
                                 id: editorEffortBox
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 40
-                                enabled: page.editorModelOptionsReady
+                                enabled: page.editorModelOptionsReady && !page.editorModelOptionsLoading
                                 model: page.efforts
                             }
                         }

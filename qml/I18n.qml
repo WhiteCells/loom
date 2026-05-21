@@ -85,6 +85,11 @@ QtObject {
             return arg(t("Health checks refreshed for %1 profiles"), match[1])
         }
 
+        match = String(message).match(/^Refreshing health checks for (\d+) profiles$/)
+        if (match) {
+            return arg(t("Refreshing health checks for %1 profiles"), match[1])
+        }
+
         match = String(message).match(/^Loom proxy listening on (.*)$/)
         if (match) {
             return arg(t("Loom proxy listening on %1"), match[1])
@@ -165,6 +170,7 @@ QtObject {
         "Health Snapshot": "健康快照",
         "Profile": "配置",
         "Endpoint": "端点",
+        "Indicator": "指示",
         "Status": "状态",
         "Latency": "延迟",
         "Checked At": "检查时间",
@@ -172,6 +178,7 @@ QtObject {
         "Refresh Status": "刷新状态",
         "Refresh all profiles": "刷新全部配置",
         "No health snapshot yet": "尚未生成健康快照",
+        "Not supported": "不支持",
         "Usage Today": "今日用量",
         "Tracked Profiles": "已跟踪配置",
         "Health": "健康",
@@ -338,6 +345,7 @@ QtObject {
         "Endpoint and key used to load available models.": "用于加载可用模型的端点和密钥。",
         "Model & Effort": "模型与推理强度",
         "Load from Endpoint": "从端点加载",
+        "Loading": "加载中",
         "Reasoning Effort": "推理强度",
         "Proxy": "代理",
         "Optional local routing applied after the provider and model are selected.": "选择提供商和模型后应用的本地可选路由。",
@@ -351,7 +359,11 @@ QtObject {
         "Profile name cannot contain / or \\.": "配置名称不能包含 / 或 \\。",
         "Enter an endpoint to load model options.": "输入端点以加载模型选项。",
         "Endpoint required before loading model options.": "加载模型选项前需要填写端点。",
+        "API key required before loading model options.": "加载模型选项前需要填写 API Key。",
         "Endpoint changed. Load options before choosing a model.": "端点已变更，请先加载选项再选择模型。",
+        "API key changed. Load options before choosing a model.": "API Key 已变更，请先加载选项再选择模型。",
+        "Loading model options...": "正在加载模型选项...",
+        "Failed to load model options: %1": "模型选项加载失败：%1",
         "%1 model options loaded": "已加载 %1 模型选项",
         "# No proxy configured": "# 未配置代理",
 
@@ -365,6 +377,15 @@ QtObject {
         "Loaded %1 profiles": "已加载 %1 个配置",
         "All Systems Go": "全部正常",
         "Needs Attention": "需要关注",
+        "OK": "正常",
+        "WARN": "警告",
+        "Checking": "检查中",
+        "pending": "等待中",
+        "unsupported": "不支持",
+        "error": "错误",
+        "invalid_json": "无效 JSON",
+        "none": "正常",
+        "unknown": "未知",
         "%1 of %2 checks healthy": "%1 / %2 项检查正常",
         "No checks yet": "尚未检查",
         "Last checked at %1": "上次检查于 %1",
@@ -378,6 +399,11 @@ QtObject {
         "Editing %1": "正在编辑 %1",
         "Health check finished for %1": "%1 的健康检查已完成",
         "Health checks refreshed for %1 profiles": "已刷新 %1 个配置的健康状态",
+        "Refreshing health checks for %1 profiles": "正在刷新 %1 个配置的健康状态",
+        "Checking provider status": "正在检查提供商状态",
+        "No provider status endpoint configured": "未配置提供商状态端点",
+        "No status description": "无状态描述",
+        "No model options found": "未找到模型选项",
         "%1 saved": "%1 已保存",
         "%1 selected": "已选择 %1",
         "Settings loaded from %1": "已从 %1 加载设置",
