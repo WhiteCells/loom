@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Loom
+Comment=Manage local AI coding agent profiles
+Exec=LoomDesktop
+Icon=loom
+Terminal=false
+Categories=Development;Utility;

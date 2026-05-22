@@ -8,6 +8,8 @@ endif()
 
 include(GNUInstallDirs)
 
+option(LOOM_DEPLOY_QT_RUNTIME "Bundle Qt runtime dependencies during install" ON)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -141,47 +143,49 @@ install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
-set(LOOM_DEPLOY_OPTIONS
-    NO_TRANSLATIONS
-    NO_UNSUPPORTED_PLATFORM_ERROR
-)
-
-if(UNIX AND NOT APPLE AND NOT ANDROID)
-    list(APPEND LOOM_DEPLOY_OPTIONS
-        INCLUDE_PLUGINS
-            qsvg
-            qsvgicon
-            qminimal
-            qoffscreen
-            qxcb
-            qxcb-egl-integration
-            qxcb-glx-integration
-            composeplatforminputcontextplugin
-            ibusplatforminputcontextplugin
-        EXCLUDE_PLUGIN_TYPES
-            accessiblebridge
-            egldeviceintegrations
-            generic
-            iconengines
-            imageformats
-            networkinformation
-            platforminputcontexts
-            platforms
-            platformthemes
-            qmltooling
-            styles
-            tls
-            wayland-decoration-client
-            wayland-graphics-integration-client
-            wayland-inputdevice-integration
-            wayland-shell-integration
-            xcbglintegrations
+if(LOOM_DEPLOY_QT_RUNTIME)
+    set(LOOM_DEPLOY_OPTIONS
+        NO_TRANSLATIONS
+        NO_UNSUPPORTED_PLATFORM_ERROR
     )
-endif()
 
-qt_generate_deploy_qml_app_script(
-    TARGET ${PROJECT_NAME}
-    OUTPUT_SCRIPT LOOM_DEPLOY_SCRIPT
-    ${LOOM_DEPLOY_OPTIONS}
-)
-install(SCRIPT ${LOOM_DEPLOY_SCRIPT})
+    if(UNIX AND NOT APPLE AND NOT ANDROID)
+        list(APPEND LOOM_DEPLOY_OPTIONS
+            INCLUDE_PLUGINS
+                qsvg
+                qsvgicon
+                qminimal
+                qoffscreen
+                qxcb
+                qxcb-egl-integration
+                qxcb-glx-integration
+                composeplatforminputcontextplugin
+                ibusplatforminputcontextplugin
+            EXCLUDE_PLUGIN_TYPES
+                accessiblebridge
+                egldeviceintegrations
+                generic
+                iconengines
+                imageformats
+                networkinformation
+                platforminputcontexts
+                platforms
+                platformthemes
+                qmltooling
+                styles
+                tls
+                wayland-decoration-client
+                wayland-graphics-integration-client
+                wayland-inputdevice-integration
+                wayland-shell-integration
+                xcbglintegrations
+        )
+    endif()
+
+    qt_generate_deploy_qml_app_script(
+        TARGET ${PROJECT_NAME}
+        OUTPUT_SCRIPT LOOM_DEPLOY_SCRIPT
+        ${LOOM_DEPLOY_OPTIONS}
+    )
+    install(SCRIPT ${LOOM_DEPLOY_SCRIPT})
+endif()

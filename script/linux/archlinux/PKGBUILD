@@ -1,0 +1,46 @@
+# Maintainer: Loom maintainers
+
+pkgname=loom-desktop
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Manage local AI coding agent profiles'
+arch=('x86_64')
+url='https://github.com/WhiteCells/loom'
+license=('LicenseRef-unknown')
+depends=(
+  'gcc-libs'
+  'glibc'
+  'qt6-base'
+  'qt6-declarative'
+  'qt6-svg'
+)
+makedepends=(
+  'cmake'
+  'ninja'
+  'qt6-tools'
+)
+source=(
+  "${pkgname}-${pkgver}.tar.gz"
+  'loom.desktop'
+)
+sha256sums=(
+  'SKIP'
+  'SKIP'
+)
+
+build() {
+  cmake -S "${srcdir}/${pkgname}-${pkgver}" -B build -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_SKIP_RPATH=ON \
+    -DLOOM_DEPLOY_QT_RUNTIME=OFF
+  cmake --build build
+}
+
+package() {
+  DESTDIR="${pkgdir}" cmake --install build
+
+  install -Dm644 "${srcdir}/loom.desktop" "${pkgdir}/usr/share/applications/loom.desktop"
+  install -Dm644 "${srcdir}/${pkgname}-${pkgver}/assets/icons/loom-app.svg" \
+    "${pkgdir}/usr/share/icons/hicolor/scalable/apps/loom.svg"
+}
