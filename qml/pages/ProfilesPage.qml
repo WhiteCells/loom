@@ -9,6 +9,7 @@ Item {
     readonly property int sideWidth: 284
     readonly property int contentMargin: 22
     readonly property int editorHorizontalPadding: 24
+    readonly property int editorColumnSpacing: 22
     readonly property int editorFieldHeight: 68
     property string profileQuery: ""
     property bool editorCreating: false
@@ -31,7 +32,6 @@ Item {
             : I18n.t(editorModelMessageKey)
     readonly property var providers: ["OpenAI", "Anthropic", "Custom"]
     readonly property var efforts: ["low", "medium", "high", "xhigh"]
-    readonly property var wireApis: ["responses", "chat"]
     readonly property int previewLineCount: Math.max(page.configLines(profileManager.currentProfile).length,
                                                      page.authLines(profileManager.currentProfile).length,
                                                      page.envLines(profileManager.currentProfile).length)
@@ -162,6 +162,10 @@ Item {
         return provider === "Anthropic" ? "Claude" : "Codex"
     }
 
+    function editorWireApi() {
+        return editorWireApiSwitch.checked ? "responses" : "chat"
+    }
+
     function loadEditorModelOptions(preferredModel) {
         var endpoint = page.cleanEndpoint(editorBaseUrlField.text)
         page.editorPreferredModel = preferredModel ? preferredModel.trim() : ""
@@ -234,7 +238,7 @@ Item {
                     editorHttpProxyField.text,
                     editorHttpsProxyField.text,
                     editorStorageSwitch.checked,
-                    editorWireApiBox.currentText,
+                    page.editorWireApi(),
                     editorOpenAiAuthSwitch.checked)
     }
 
@@ -249,7 +253,7 @@ Item {
             editorHttpProxyField.text = ""
             editorHttpsProxyField.text = ""
             editorStorageSwitch.checked = true
-            editorWireApiBox.currentIndex = page.indexFor("responses")
+            editorWireApiSwitch.checked = true
             editorOpenAiAuthSwitch.checked = true
             page.editorModelOptions = []
             editorModelBox.currentIndex = -1
@@ -273,7 +277,7 @@ Item {
         editorHttpProxyField.text = profile.httpProxy || ""
         editorHttpsProxyField.text = profile.httpsProxy || ""
         editorStorageSwitch.checked = profile.disableResponseStorage !== false
-        editorWireApiBox.currentIndex = page.indexFor(page.wireApis, profile.wireApi || "responses")
+        editorWireApiSwitch.checked = (profile.wireApi || "responses") === "responses"
         editorOpenAiAuthSwitch.checked = profile.requiresOpenAiAuth !== false
         page.loadEditorModelOptions(profile.model || "")
         editorEffortBox.currentIndex = page.indexFor(page.efforts, profile.reasoningEffort || "high")
@@ -318,7 +322,7 @@ Item {
                         editorHttpProxyField.text,
                         editorHttpsProxyField.text,
                         editorStorageSwitch.checked,
-                        editorWireApiBox.currentText,
+                        page.editorWireApi(),
                         editorOpenAiAuthSwitch.checked)
             if (saved) {
                 page.saveCurrentInterfaceConfig()
@@ -340,7 +344,7 @@ Item {
                     editorHttpProxyField.text,
                     editorHttpsProxyField.text,
                     editorStorageSwitch.checked,
-                    editorWireApiBox.currentText,
+                    page.editorWireApi(),
                     editorOpenAiAuthSwitch.checked)
         if (saved) {
             page.saveCurrentInterfaceConfig()
@@ -967,11 +971,12 @@ Item {
                         Layout.leftMargin: page.editorHorizontalPadding
                         Layout.rightMargin: page.editorHorizontalPadding
                         columns: width < 560 ? 1 : 2
-                        columnSpacing: 16
+                        columnSpacing: page.editorColumnSpacing
                         rowSpacing: 18
 
                         ColumnLayout {
                             Layout.fillWidth: true
+                            Layout.preferredWidth: 0
                             Layout.preferredHeight: page.editorWarning.length > 0 ? 88 : page.editorFieldHeight
                             spacing: 8
 
@@ -1001,6 +1006,7 @@ Item {
 
                         ColumnLayout {
                             Layout.fillWidth: true
+                            Layout.preferredWidth: 0
                             Layout.preferredHeight: page.editorFieldHeight
                             spacing: 8
 
@@ -1028,6 +1034,172 @@ Item {
                         spacing: 6
 
                         Text {
+                            text: I18n.t("Connection")
+                            color: Theme.text
+                            font.pixelSize: 14
+                            font.weight: Font.Bold
+                            Layout.fillWidth: true
+                        }
+
+                        Text {
+                            text: I18n.t("Endpoint and key used to load available models.")
+                            color: Theme.muted
+                            font.pixelSize: 12
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    GridLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: page.editorHorizontalPadding
+                        Layout.rightMargin: page.editorHorizontalPadding
+                        columns: width < 560 ? 1 : 2
+                        columnSpacing: page.editorColumnSpacing
+                        rowSpacing: 18
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 0
+                            Layout.preferredHeight: page.editorFieldHeight
+                            spacing: 8
+
+                            Text {
+                                text: I18n.t("Base URL")
+                                color: Theme.text
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                            }
+
+                            FormTextField {
+                                id: editorBaseUrlField
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                placeholderText: "https://api.openai.com/v1"
+                                onTextEdited: page.markEndpointChanged()
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 0
+                            Layout.preferredHeight: page.editorFieldHeight
+                            spacing: 8
+
+                            Text {
+                                text: I18n.t("API Key")
+                                color: Theme.text
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                            }
+
+                            FormTextField {
+                                id: editorApiKeyField
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                secret: true
+                                placeholderText: "sk-..."
+                                onTextEdited: page.markApiKeyChanged()
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: page.editorHorizontalPadding
+                        Layout.rightMargin: page.editorHorizontalPadding
+                        spacing: 14
+
+                        Column {
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Text {
+                                text: I18n.t("Model & Effort")
+                                color: Theme.text
+                                font.pixelSize: 14
+                                font.weight: Font.Bold
+                                width: parent.width
+                            }
+
+                            Text {
+                                text: page.editorModelMessage
+                                color: Theme.muted
+                                font.pixelSize: 12
+                                width: parent.width
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        ActionButton {
+                            text: page.editorModelOptionsLoading ? I18n.t("Loading") : I18n.t("Load from Endpoint")
+                            iconName: "refresh-cw"
+                            enabled: !page.editorModelOptionsLoading && page.cleanEndpoint(editorBaseUrlField.text).length > 0
+                            Layout.alignment: Qt.AlignVCenter
+                            onClicked: page.loadEditorModelOptions("")
+                        }
+                    }
+
+                    GridLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: page.editorHorizontalPadding
+                        Layout.rightMargin: page.editorHorizontalPadding
+                        columns: width < 560 ? 1 : 2
+                        columnSpacing: page.editorColumnSpacing
+                        rowSpacing: 18
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 0
+                            Layout.preferredHeight: page.editorFieldHeight
+                            spacing: 8
+
+                            Text {
+                                text: I18n.t("Model")
+                                color: Theme.text
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                            }
+
+                            FormComboBox {
+                                id: editorModelBox
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                enabled: page.editorModelOptionsReady && !page.editorModelOptionsLoading
+                                model: page.editorModelOptions
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 0
+                            Layout.preferredHeight: page.editorFieldHeight
+                            spacing: 8
+
+                            Text {
+                                text: I18n.t("Reasoning Effort")
+                                color: Theme.text
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                            }
+
+                            FormComboBox {
+                                id: editorEffortBox
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                enabled: page.editorModelOptionsReady && !page.editorModelOptionsLoading
+                                model: page.efforts
+                            }
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: page.editorHorizontalPadding
+                        Layout.rightMargin: page.editorHorizontalPadding
+                        spacing: 6
+
+                        Text {
                             text: I18n.t("Codex Runtime")
                             color: Theme.text
                             font.pixelSize: 14
@@ -1044,31 +1216,43 @@ Item {
                         }
                     }
 
-                    GridLayout {
+                    ColumnLayout {
                         Layout.fillWidth: true
                         Layout.leftMargin: page.editorHorizontalPadding
                         Layout.rightMargin: page.editorHorizontalPadding
-                        columns: width < 560 ? 1 : 2
-                        columnSpacing: 16
-                        rowSpacing: 18
+                        spacing: 14
 
-                        ColumnLayout {
+                        RowLayout {
                             Layout.fillWidth: true
                             Layout.preferredHeight: page.editorFieldHeight
-                            spacing: 8
+                            spacing: 12
 
-                            Text {
-                                text: I18n.t("Wire API")
-                                color: Theme.text
-                                font.pixelSize: 12
-                                font.weight: Font.DemiBold
+                            Column {
+                                Layout.fillWidth: true
+                                spacing: 6
+
+                                Text {
+                                    text: I18n.t("Wire API")
+                                    color: Theme.text
+                                    font.pixelSize: 12
+                                    font.weight: Font.DemiBold
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    text: page.editorWireApi()
+                                    color: Theme.muted
+                                    font.pixelSize: 12
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                }
                             }
 
-                            FormComboBox {
-                                id: editorWireApiBox
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 40
-                                model: page.wireApis
+                            ToggleSwitch {
+                                id: editorWireApiSwitch
+                                checked: true
+                                Layout.alignment: Qt.AlignVCenter
                             }
                         }
 
@@ -1148,168 +1332,6 @@ Item {
                         spacing: 6
 
                         Text {
-                            text: I18n.t("Connection")
-                            color: Theme.text
-                            font.pixelSize: 14
-                            font.weight: Font.Bold
-                            Layout.fillWidth: true
-                        }
-
-                        Text {
-                            text: I18n.t("Endpoint and key used to load available models.")
-                            color: Theme.muted
-                            font.pixelSize: 12
-                            Layout.fillWidth: true
-                            elide: Text.ElideRight
-                        }
-                    }
-
-                    GridLayout {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: page.editorHorizontalPadding
-                        Layout.rightMargin: page.editorHorizontalPadding
-                        columns: width < 560 ? 1 : 2
-                        columnSpacing: 16
-                        rowSpacing: 18
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: page.editorFieldHeight
-                            spacing: 8
-
-                            Text {
-                                text: I18n.t("Base URL")
-                                color: Theme.text
-                                font.pixelSize: 12
-                                font.weight: Font.DemiBold
-                            }
-
-                            FormTextField {
-                                id: editorBaseUrlField
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 40
-                                placeholderText: "https://api.openai.com/v1"
-                                onTextEdited: page.markEndpointChanged()
-                            }
-                        }
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: page.editorFieldHeight
-                            spacing: 8
-
-                            Text {
-                                text: I18n.t("API Key")
-                                color: Theme.text
-                                font.pixelSize: 12
-                                font.weight: Font.DemiBold
-                            }
-
-                            FormTextField {
-                                id: editorApiKeyField
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 40
-                                secret: true
-                                placeholderText: "sk-..."
-                                onTextEdited: page.markApiKeyChanged()
-                            }
-                        }
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: page.editorHorizontalPadding
-                        Layout.rightMargin: page.editorHorizontalPadding
-                        spacing: 14
-
-                        Column {
-                            Layout.fillWidth: true
-                            spacing: 6
-
-                            Text {
-                                text: I18n.t("Model & Effort")
-                                color: Theme.text
-                                font.pixelSize: 14
-                                font.weight: Font.Bold
-                                width: parent.width
-                            }
-
-                            Text {
-                                text: page.editorModelMessage
-                                color: Theme.muted
-                                font.pixelSize: 12
-                                width: parent.width
-                                elide: Text.ElideRight
-                            }
-                        }
-
-                        ActionButton {
-                            text: page.editorModelOptionsLoading ? I18n.t("Loading") : I18n.t("Load from Endpoint")
-                            iconName: "refresh-cw"
-                            enabled: !page.editorModelOptionsLoading && page.cleanEndpoint(editorBaseUrlField.text).length > 0
-                            Layout.alignment: Qt.AlignVCenter
-                            onClicked: page.loadEditorModelOptions("")
-                        }
-                    }
-
-                    GridLayout {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: page.editorHorizontalPadding
-                        Layout.rightMargin: page.editorHorizontalPadding
-                        columns: width < 560 ? 1 : 2
-                        columnSpacing: 16
-                        rowSpacing: 18
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: page.editorFieldHeight
-                            spacing: 8
-
-                            Text {
-                                text: I18n.t("Model")
-                                color: Theme.text
-                                font.pixelSize: 12
-                                font.weight: Font.DemiBold
-                            }
-
-                            FormComboBox {
-                                id: editorModelBox
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 40
-                                enabled: page.editorModelOptionsReady && !page.editorModelOptionsLoading
-                                model: page.editorModelOptions
-                            }
-                        }
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: page.editorFieldHeight
-                            spacing: 8
-
-                            Text {
-                                text: I18n.t("Reasoning Effort")
-                                color: Theme.text
-                                font.pixelSize: 12
-                                font.weight: Font.DemiBold
-                            }
-
-                            FormComboBox {
-                                id: editorEffortBox
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 40
-                                enabled: page.editorModelOptionsReady && !page.editorModelOptionsLoading
-                                model: page.efforts
-                            }
-                        }
-                    }
-
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: page.editorHorizontalPadding
-                        Layout.rightMargin: page.editorHorizontalPadding
-                        spacing: 6
-
-                        Text {
                             text: I18n.t("Proxy")
                             color: Theme.text
                             font.pixelSize: 14
@@ -1331,11 +1353,12 @@ Item {
                         Layout.leftMargin: page.editorHorizontalPadding
                         Layout.rightMargin: page.editorHorizontalPadding
                         columns: width < 560 ? 1 : 2
-                        columnSpacing: 16
+                        columnSpacing: page.editorColumnSpacing
                         rowSpacing: 18
 
                         ColumnLayout {
                             Layout.fillWidth: true
+                            Layout.preferredWidth: 0
                             Layout.preferredHeight: page.editorFieldHeight
                             spacing: 8
 
@@ -1356,6 +1379,7 @@ Item {
 
                         ColumnLayout {
                             Layout.fillWidth: true
+                            Layout.preferredWidth: 0
                             Layout.preferredHeight: page.editorFieldHeight
                             spacing: 8
 

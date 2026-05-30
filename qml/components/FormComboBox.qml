@@ -6,7 +6,13 @@ ComboBox {
     id: control
 
     property bool translateItems: false
+    property int maxVisibleRows: 6
+    readonly property int popupRowHeight: 36
+    readonly property int effectiveMaxVisibleRows: Math.max(1, maxVisibleRows)
+    readonly property int popupVisibleRows: Math.min(count, effectiveMaxVisibleRows)
+    readonly property bool popupScrollable: count > effectiveMaxVisibleRows
 
+    implicitWidth: 220
     implicitHeight: 40
     leftPadding: 14
     rightPadding: 38
@@ -55,7 +61,7 @@ ComboBox {
     popup: Popup {
         y: control.height + 4
         width: control.width
-        implicitHeight: contentItem.implicitHeight
+        implicitHeight: contentItem.implicitHeight + topPadding + bottomPadding
         leftPadding: 4
         rightPadding: 4
         topPadding: 4
@@ -70,7 +76,9 @@ ComboBox {
 
         contentItem: ListView {
             clip: true
-            implicitHeight: Math.min(contentHeight, 168)
+            implicitHeight: control.popupVisibleRows * control.popupRowHeight
+            interactive: control.popupScrollable
+            boundsBehavior: Flickable.StopAtBounds
             model: control.popup.visible ? control.delegateModel : null
             currentIndex: control.highlightedIndex
             ScrollBar.horizontal: StyledScrollBar {
@@ -78,7 +86,7 @@ ComboBox {
                 parent: control.popup.contentItem
             }
             ScrollBar.vertical: StyledScrollBar {
-                policy: ScrollBar.AsNeeded
+                policy: control.popupScrollable ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
                 parent: control.popup.contentItem
             }
         }

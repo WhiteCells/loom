@@ -8,6 +8,7 @@ TextField {
     property bool secret: false
     property bool secretVisible: false
 
+    implicitWidth: 220
     implicitHeight: 40
     leftPadding: 14
     rightPadding: secret ? 44 : 14
