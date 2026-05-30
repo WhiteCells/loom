@@ -10,6 +10,8 @@ Item {
     property string value: ""
     property string detail: ""
     property color accent: Theme.accent
+    property color backgroundColor: Theme.panelSoft
+    property color borderColor: Theme.border
 
     Layout.fillWidth: true
     Layout.preferredHeight: Math.max(78, textColumn.implicitHeight + 30)
@@ -17,9 +19,9 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: Theme.controlRadius
-        color: Theme.controlDisabled
+        color: row.backgroundColor
         border.width: 1
-        border.color: Theme.controlBorder
+        border.color: row.borderColor
     }
 
     Rectangle {
