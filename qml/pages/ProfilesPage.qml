@@ -1419,15 +1419,6 @@ Item {
                 Layout.rightMargin: page.editorHorizontalPadding
                 spacing: 10
 
-                ActionButton {
-                    text: I18n.t("Delete")
-                    iconName: "trash-2"
-                    variant: "danger"
-                    visible: !page.editorCreating
-                    enabled: !page.editorCreating && profileManager.profiles.length > 1
-                    onClicked: page.requestDeleteSelectedProfile(true)
-                }
-
                 Item {
                     Layout.fillWidth: true
                 }
