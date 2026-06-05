@@ -21,7 +21,21 @@ Item {
         radius: Theme.controlRadius
         color: control.selected ? Theme.selected : (control.hovered ? Theme.panelHover : "transparent")
         border.width: 1
-        border.color: control.selected ? Theme.accentHover : "transparent"
+        border.color: control.selected ? Theme.selectedBorder : (control.hovered ? Theme.border : "transparent")
+
+        Behavior on color {
+            ColorAnimation {
+                duration: Theme.hoverDuration
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        Behavior on border.color {
+            ColorAnimation {
+                duration: Theme.hoverDuration
+                easing.type: Easing.OutCubic
+            }
+        }
     }
 
     Rectangle {
@@ -31,7 +45,14 @@ Item {
         anchors.left: parent.left
         anchors.leftMargin: 1
         anchors.verticalCenter: parent.verticalCenter
-        color: control.selected ? Theme.accentHover : "transparent"
+        color: control.selected ? Theme.accent : "transparent"
+
+        Behavior on color {
+            ColorAnimation {
+                duration: Theme.hoverDuration
+                easing.type: Easing.OutCubic
+            }
+        }
     }
 
     Column {

@@ -67,8 +67,11 @@ QtObject {
     readonly property var accentSofts: [accentBlueSoft, accentGreenSoft, accentAmberSoft, accentSkySoft, accentMintSoft, accentPeachSoft]
     readonly property var selectedDark: ["#172846", "#0d3022", "#342710", "#14354d", "#103d2e", "#49311a"]
     readonly property var selectedLight: ["#dce8f6", "#d7efe2", "#f5e7c9", "#d9efff", "#daf6eb", "#faecd7"]
+    readonly property var selectedBordersDark: ["#2b415f", "#244a3b", "#574321", "#2a4c61", "#265442", "#60452d"]
+    readonly property var selectedBordersLight: ["#c4d8ec", "#b9dcc8", "#dfcea7", "#bfe0f7", "#c2e9da", "#ead2b8"]
     readonly property var accentTextColors: ["#f8fbfb", "#f8fbfb", dark ? "#1f1705" : "#f8fbfb", "#182121", "#182121", "#182121"]
     readonly property color selected: palette(dark ? selectedDark : selectedLight)
+    readonly property color selectedBorder: palette(dark ? selectedBordersDark : selectedBordersLight)
     readonly property color accent: palette(accentBases)
     readonly property color accentHover: palette(accentHovers)
     readonly property color accentSoft: palette(accentSofts)
